@@ -28,6 +28,8 @@ Build an end-to-end Python RAG system over a real technical service manual: reli
 
 ## 4. Design decisions (with rationale)
 
+Decisions made after this spec was agreed are recorded in [decisions.md](decisions.md) (D8 onward); D1–D7 below remain authoritative here.
+
 | # | Decision | Chosen | Why | Alternatives considered |
 | --- | --- | --- | --- | --- |
 | D1 | RAG framework | **LlamaIndex** | Retrieval-focused document Q&A standard; least glue code; built-in eval. | LangChain (larger ecosystem, more boilerplate; stronger for agentic); a from-scratch pipeline (max control, slower). |
