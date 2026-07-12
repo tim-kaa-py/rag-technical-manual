@@ -4,6 +4,7 @@
 # Private project context (interview strategy / personal notes — never publish)
 docs/*.private.md
 handover.md
+.claude/settings.local.json
 
 # Data (copyrighted manuals / local assets — never redistribute)
 data/*.pdf
