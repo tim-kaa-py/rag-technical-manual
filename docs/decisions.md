@@ -52,3 +52,16 @@ Running log of design decisions. Each entry: what was decided, what was consider
 - *Formal ADR files (one per decision)* — industry standard with Status/Context/Consequences, but heavier ceremony than a single concise log warrants at this scale. Rejected.
 
 **Why:** the log stays useful only if writing it is effortless and consistent; a skill makes the threshold and format automatic instead of remembered.
+
+## D11 — Vector search: exact scan + cosine, no ANN index (2026-07-12)
+
+**Decision:** Dense retrieval runs as an exact (sequential) pgvector scan with cosine distance (`vector_cosine_ops`); no HNSW/IVFFlat index. M1 verifies in the database that the vector store created no ANN index behind our back.
+
+**Considered:**
+- *Exact scan* — chosen: at ~100–150 chunk vectors a full scan is microseconds with 100% recall by construction, and it keeps ANN recall out of the M2 eval as a confounding variable.
+- *HNSW* — the production-standard ANN index with the best recall/latency curve at scale, but at this corpus size its tuning knobs (`m`, `ef_construction`, `ef_search`) are pure overhead. Rejected.
+- *IVFFlat* — cheaper to build than HNSW, but worse recall/latency trade and needs training data present at build time. Rejected.
+
+**Why:** ANN indexes exist to trade recall for latency once corpora reach millions of vectors; adding one at 150 vectors solves a problem we don't have and blurs the eval. Cosine because text-embedding-3 vectors are unit-normalized (cosine ≡ dot product in ranking) and cosine is the self-documenting convention.
+
+**Named upgrade trigger:** corpus growth toward ~10M vectors or p95 latency targets under concurrency — then HNSW, accepting its build cost and tuning surface.
