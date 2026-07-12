@@ -1,0 +1,31 @@
+# Secrets
+.env
+
+# Private project context (interview strategy / personal notes — never publish)
+docs/*.private.md
+
+# Data (copyrighted manuals / local assets — never redistribute)
+data/*.pdf
+data/*.png
+data/*.jpg
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Local vector-store / build artifacts
+*.sqlite
+.cache/
+outputs/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
