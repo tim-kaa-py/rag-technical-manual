@@ -40,3 +40,15 @@ Running log of design decisions. Each entry: what was decided, what was consider
 - Right page retrieved but judge flags truncated/ungrounded answers → the one symptom small-to-big treats.
 
 **Known limitation (documented, not hidden):** p. 48's maintenance-schedule matrix uses icon cells; task-to-interval associations cannot survive text extraction under any chunking strategy — it is a parsing/multimodal problem of the same class as the p. 42 viscosity chart, and the golden set includes a question predicted to fail on it.
+
+## D10 — Decision-logging skill design (2026-07-12)
+
+**Decision:** A project-level Claude Code skill (`.claude/skills/decision-logging/`) that appends entries to this file whenever a design decision is confirmed: hybrid triggering (auto via skill description + manual `/decision-logging`), a defensibility threshold (log only when ≥2 viable options were weighed *and* the choice needs defending later), entries in this file's D-format.
+
+**Considered:**
+- *Project-level skill* — chosen: versioned with the repo, so the logging convention travels with the project.
+- *Personal (user-level) skill* — reusable across all projects, but invisible to this repo; can still be promoted later. Rejected for now.
+- *Hook-based automation* — hooks fire on mechanical tool events and cannot detect the semantic event "a decision was confirmed". Technically unfit.
+- *Formal ADR files (one per decision)* — industry standard with Status/Context/Consequences, but heavier ceremony than a single concise log warrants at this scale. Rejected.
+
+**Why:** the log stays useful only if writing it is effortless and consistent; a skill makes the threshold and format automatic instead of remembered.
