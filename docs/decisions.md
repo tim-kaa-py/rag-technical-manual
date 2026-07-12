@@ -65,3 +65,27 @@ Running log of design decisions. Each entry: what was decided, what was consider
 **Why:** ANN indexes exist to trade recall for latency once corpora reach millions of vectors; adding one at 150 vectors solves a problem we don't have and blurs the eval. Cosine because text-embedding-3 vectors are unit-normalized (cosine ≡ dot product in ranking) and cosine is the self-documenting convention.
 
 **Named upgrade trigger:** corpus growth toward ~10M vectors or p95 latency targets under concurrency — then HNSW, accepting its build cost and tuning surface.
+
+## D12 — Keyword pass: in-memory BM25 over the Postgres chunks (2026-07-12)
+
+**Decision:** The sparse half of hybrid retrieval (M3) is an in-memory BM25 index (LlamaIndex `BM25Retriever`), rebuilt at API startup from the chunk nodes loaded **out of Postgres** — never by re-chunking the PDF — so dense and sparse always score byte-identical chunk sets. Postgres remains the single store of record.
+
+**Considered:**
+- *In-memory BM25* — chosen: OR-semantics (any shared term earns a score) and IDF weighting (rare identifiers like `EN590` outweigh corpus-wide words like "fuel"); per-term explainable (N1); deterministic across runs (N3).
+- *Postgres FTS (tsvector/ts_rank)* — keeps the keyword pass in-database, but `plainto_tsquery` ANDs all query terms, so natural-language questions can silently return zero sparse rows — hybrid degrades to dense-only unnoticed and the M3 delta lies; ts_rank also has no IDF. Rejected.
+
+**Why:** the manual is identifier-dense (fuel standards p. 43, part codes pp. 34–37, numeric limits) — exactly the queries a sparse pass exists for; the FTS AND-trap would corrupt the very measurement M3 is for.
+
+**Named upgrade trigger:** corpus outgrows a startup rebuild (multi-document, continuous ingest) → move sparse in-database (e.g. pg_search/ParadeDB for real BM25 in Postgres).
+
+**Known limitation:** the BM25 index is a derived cache — after re-ingesting, the API process must restart to rebuild it (acceptable: ingest is an offline batch step and already implies a restart).
+
+## D13 — Fusion: Reciprocal Rank Fusion, k=60 (2026-07-12)
+
+**Decision:** Dense and BM25 ranked lists merge via RRF — `score = Σ 1/(60 + rank)` — with everything explicit: fusion mode set by name, `num_queries=1` (no silent LLM query expansion), candidate depth fixed on both retrievers (10 each in, top-5 out) so the eval compares equal context budgets.
+
+**Considered:**
+- *RRF* — chosen: rank-based, immune to the incomparable score scales (bunched cosine vs unbounded BM25); zero tunable parameters.
+- *Weighted score fusion (α-blend of normalized scores)* — genuinely superior when hundreds of labeled queries exist to fit α on, but tuning α against an 8–10-question golden set is overfitting and contaminates the eval as a measuring instrument. Rejected.
+
+**Why:** with no knob, the M2→M3 delta is attributable to "added BM25 + RRF", full stop, and the golden set stays a clean exam. k=60 is the literature constant (Cormack et al. 2009), empirically insensitive over a wide band — adopted, not tuned.
