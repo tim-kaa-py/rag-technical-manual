@@ -7,8 +7,11 @@ boundaries (D9). A missed heading degrades one citation label, nothing more.
 import re
 
 # Boilerplate the manual repeats on every page (D9 corpus findings).
+# pypdf extracts the "WE ARE YOUR EVERLASTING COMPANY" logo as standalone
+# lines (EVERLASTING / WE / COMPANY / AREYOUR), twice per page.
 _BOILERPLATE = (
     re.compile(r"^.*EVERLASTING\s+COMPANY.*$", re.MULTILINE),
+    re.compile(r"^\s*(?:EVERLASTING|WE|COMPANY|AREYOUR)\s*$", re.MULTILINE),
     re.compile(r"^.*BBK-V\.\d+_ENG.*$", re.MULTILINE),
     re.compile(r"^.*People First.*$", re.MULTILINE),
 )

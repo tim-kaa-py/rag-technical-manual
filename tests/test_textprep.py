@@ -18,6 +18,28 @@ def test_clean_removes_header_and_footer_lines():
     assert "5.6. Fuel" in cleaned  # headings survive cleaning
 
 
+def test_clean_removes_multiline_logo_as_pypdf_extracts_it():
+    # pypdf renders the page logo as four standalone lines, twice per page
+    raw = (
+        "EVERLASTING\n"
+        "WE\n"
+        "COMPANY\n"
+        "AREYOUR\n"
+        "EVERLASTING\n"
+        "WE\n"
+        "COMPANY\n"
+        "AREYOUR\n"
+        "5.4.Lubrication Oil\n"
+        "The lubrication oil must be changed periodically.\n"
+    )
+    cleaned = clean_page_text(raw)
+    for logo_word in ("EVERLASTING", "AREYOUR"):
+        assert logo_word not in cleaned
+    assert "WE\n" not in cleaned and not cleaned.startswith("WE")
+    assert "The lubrication oil must be changed periodically." in cleaned
+    assert "5.4.Lubrication Oil" in cleaned
+
+
 def test_detect_heading_matches_all_four_manual_formats():
     # dot-glued, dot-space, hyphen, space (the four formats Ingrid found)
     assert detect_heading("1.SAFETY PRECAUTIONS") == "1 SAFETY PRECAUTIONS"
