@@ -89,3 +89,17 @@ Running log of design decisions. Each entry: what was decided, what was consider
 - *Weighted score fusion (α-blend of normalized scores)* — genuinely superior when hundreds of labeled queries exist to fit α on, but tuning α against an 8–10-question golden set is overfitting and contaminates the eval as a measuring instrument. Rejected.
 
 **Why:** with no knob, the M2→M3 delta is attributable to "added BM25 + RRF", full stop, and the golden set stays a clean exam. k=60 is the literature constant (Cormack et al. 2009), empirically insensitive over a wide band — adopted, not tuned.
+
+## D14 — Reranking: listwise, single Claude call (2026-07-13)
+
+**Decision:** The F3 reranker is **listwise**: one Claude call receives the question plus all 10 fused candidates and returns the top-5 chunk IDs in relevance order as JSON. If the response fails to parse, the pipeline falls back to the RRF order — a reranker failure can degrade ranking quality but never break a query. M3 measures hybrid-without-rerank before hybrid-with-rerank so the reranking delta is attributable.
+
+**Considered:**
+- *Listwise (one call)* — chosen: candidates are judged against each other, which is the actual task; one API call (~5k tokens for 10×512-token chunks).
+- *Pointwise (score each chunk 0–10, sort)* — parallelizable and parse-safe, but scores from separate calls aren't calibrated against each other, which is shaky when the output is an ordering; 10× the calls. Rejected.
+- *Pairwise comparisons* — highest accuracy in the literature, O(n²) calls; disproportionate. Rejected.
+- *Managed rerank API (Cohere/Voyage hosted cross-encoder)* — production-realistic and cheap, but adds a third provider for a stage the spec keeps on Claude. Rejected.
+
+**Why:** reranking exists because bi-encoder retrieval scores query and chunk vectors that were computed independently ("same topic"), while a reranker reads them together ("actually answers this"); listwise is the judging mode that matches that purpose at the lowest call count, and the RRF fallback caps its blast radius.
+
+**Known limitation:** LLM listwise ranking carries mild positional bias (earlier candidates slightly favored); accepted at this scale rather than mitigated with shuffled multi-pass voting.
