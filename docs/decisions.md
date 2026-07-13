@@ -143,3 +143,16 @@ Running log of design decisions. Each entry: what was decided, what was consider
 **Why:** the two binary axes disagree diagnostically — grounded-but-wrong = retrieval failure; ungrounded-but-right = answered from parametric knowledge (the failure D15 exists to catch, invisible to a correctness-only eval). Separate calls prevent the golden answer leaking into the groundedness judgment.
 
 **Measurement rules (frozen with this decision):** trap question excluded from retrieval metrics (own row: refused yes/no); p. 48 question stays in the aggregate annotated "predicted fail — D9"; every measured config delivers exactly 5 chunks (dense@5 / fused@5 / reranked@5, three-column comparison + D3 embedding A/B); expected-page sets and hand-written golden answers frozen before results exist (later fixes go through this log); judge calibrated once by a 3× flip-rate run (0 flips → single-run thereafter, else majority-of-3); retrieved context logged at generation time and judged as-logged; report counts (7/9) never percentages, per-question table primary, instrument disclosure (judge model, prompt version, same-vendor limitation, sensitivity ≈ 11 points/question) in the header.
+
+## D18 — Ingest idempotency: drop and rebuild (2026-07-13)
+
+**Decision:** Every `src.ingest` run starts by deleting all rows in the index, then re-parses, re-chunks, re-embeds, and reloads. The index always exactly reflects the current code.
+
+**Considered:**
+- *Drop and rebuild* — chosen: perfectly deterministic (N3), and the property D12's byte-identical-chunk-sets invariant leans on; the "cost" is re-embedding ~150 × 512-token chunks ≈ a fifth of a cent per run.
+- *Upsert by deterministic chunk hash* — the real production pattern for large or continuously-ingested corpora, but here it means owning stable-ID and orphan-cleanup logic to save a fraction of a cent. Rejected.
+- *Append (no handling)* — the default trap: every re-run duplicates the corpus, retrieval returns copies, eval numbers silently corrupt. Rejected.
+
+**Why:** ingest is re-run after every chunking/parsing tweak; a dirty index masquerades as a retrieval bug and contaminates the eval. Determinism is worth infinitely more than $0.002.
+
+**Named upgrade trigger:** re-embedding starts costing real money (corpus scale) or ingest becomes continuous → upsert by content hash with orphan cleanup.
