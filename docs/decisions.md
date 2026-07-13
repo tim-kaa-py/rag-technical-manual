@@ -156,3 +156,14 @@ Running log of design decisions. Each entry: what was decided, what was consider
 **Why:** ingest is re-run after every chunking/parsing tweak; a dirty index masquerades as a retrieval bug and contaminates the eval. Determinism is worth infinitely more than $0.002.
 
 **Named upgrade trigger:** re-embedding starts costing real money (corpus scale) or ingest becomes continuous → upsert by content hash with orphan cleanup.
+
+## D19 — Troubleshooting table (pp. 50–51) is image-only: record now, fix via vision in M5 (2026-07-13)
+
+**Decision:** The PROBLEM/CAUSES/REMEDY troubleshooting table on pp. 50–51 exists only as embedded images (verified: pypdf *and* PyMuPDF both extract ~55 chars of footer, nothing else; ~11 images per page). Proceed with M1 unchanged; the slow-crank golden question becomes a second annotated **predicted-fail** row (alongside p. 48); M5 extends from "caption one chart" to also captioning the pp. 50–51 table images. This supersedes D9's "troubleshooting miss → hand-chunk pp. 49–51" trigger, whose remedy is impossible — there is no text to hand-chunk.
+
+**Considered:**
+- *Record now, decide in M5 after the eval demonstrates the miss* — chosen: keeps the measure-first discipline; M2 produces a real number proving the gap before the multimodal fix lands.
+- *Widen M5 scope immediately* — same end state, honest about the inevitability, but commits to a fix before the eval has demonstrated the need. Rejected.
+- *OCR pass at ingest* — would recover text without vision models, but adds a new dependency and an uncontrolled extraction path for exactly the content M5's captioning already covers better. Rejected.
+
+**Why:** the gap is a corpus fact, not a parser failure — escalation per D8 was tested and gains nothing. Letting the eval confirm the predicted miss first turns a limitation into a measured before/after for the multimodal milestone.
