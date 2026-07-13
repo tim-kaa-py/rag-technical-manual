@@ -128,3 +128,18 @@ Running log of design decisions. Each entry: what was decided, what was consider
 **Why:** at this corpus and query volume the cost difference is cents — the value of the mix is the discipline: each call sized to its task, with an eval-guarded swap trigger. Opus-as-judge over Sonnet-as-generator also avoids a model judging itself (same-vendor bias remains and is stated openly as a limitation of the eval design).
 
 **Named swap trigger:** if M3 shows Haiku reranking with a zero or negative delta, swap the reranker to Sonnet 5 (one string) and re-measure before concluding reranking doesn't help.
+
+## D17 — Eval metrics: hit@5 + MRR@5; judge = two binary axes (2026-07-13)
+
+**Decision:** Retrieval is measured by **hit@5** (a chunk from the pre-frozen expected-page set appears in the final top-5) and **MRR@5** (reciprocal rank of the first such chunk; RR=0 on miss; chunks, not pages, define rank). The judge (Opus 4.8, per D16) outputs **two binary verdicts in two separate calls**: *groundedness* (reference-free: question + retrieved context + answer, golden answer withheld; fails if ANY claim is unsupported) and *correctness* (reference-based: question + golden answer + answer, context withheld) — justification field before verdict field in strict JSON; parse failure fails the run (no fallback in the eval, unlike D14's serving path).
+
+**Considered:**
+- *hit@5 + MRR@5* — chosen: hit@5 measures selection (right page in context), MRR@5 measures ordering — the D14 reranker's effect is invisible to hit@5 alone.
+- *hit@5 only* — blind to rank movement inside the top-5; cannot show reranking working. Rejected.
+- *nDCG / precision@5 / recall@k* — nDCG needs graded labels we don't have; precision@5's ceiling is the context budget, not quality; multi-page recall is a per-question column, not a metric. Rejected.
+- *1–5 judge scale* — uncalibrated, ordinal averaging is a category error, indefensible aloud. Rejected.
+- *Per-claim decomposition (RAGAS-style)* — right idea at scale, false precision at n≈9; its strictness is kept via the any-unsupported-claim-fails rubric. Upgrade trigger: answers become long procedures.
+
+**Why:** the two binary axes disagree diagnostically — grounded-but-wrong = retrieval failure; ungrounded-but-right = answered from parametric knowledge (the failure D15 exists to catch, invisible to a correctness-only eval). Separate calls prevent the golden answer leaking into the groundedness judgment.
+
+**Measurement rules (frozen with this decision):** trap question excluded from retrieval metrics (own row: refused yes/no); p. 48 question stays in the aggregate annotated "predicted fail — D9"; every measured config delivers exactly 5 chunks (dense@5 / fused@5 / reranked@5, three-column comparison + D3 embedding A/B); expected-page sets and hand-written golden answers frozen before results exist (later fixes go through this log); judge calibrated once by a 3× flip-rate run (0 flips → single-run thereafter, else majority-of-3); retrieved context logged at generation time and judged as-logged; report counts (7/9) never percentages, per-question table primary, instrument disclosure (judge model, prompt version, same-vendor limitation, sensitivity ≈ 11 points/question) in the header.
