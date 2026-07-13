@@ -31,7 +31,10 @@ def clean_page_text(text: str) -> str:
     for pattern in _BOILERPLATE:
         text = pattern.sub("", text)
     # collapse the blank lines the removals leave behind
-    return re.sub(r"\n{3,}", "\n\n", text).strip()
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    # drop the printed page number (first line of every page); left in, it
+    # defeats heading-at-chunk-start detection and shifts section labels
+    return re.sub(r"\A\d{1,3}\s*\n+", "", text)
 
 
 def detect_heading(line: str) -> str | None:
@@ -39,6 +42,10 @@ def detect_heading(line: str) -> str | None:
     if not match:
         return None
     number, title = match.groups()
+    # Top-level headings always carry a "." or "-" separator ("1.SAFETY",
+    # "3-INSTALLATION"); a bare "10 Fuel Feed Pump" is a diagram legend item.
+    if "." not in number and not re.match(rf"^{number}[.\-]", line.strip()):
+        return None
     title = title.strip()
     words = title.split()
     if not all(w[0].isupper() or w.lower() in _CONNECTORS for w in words):
