@@ -103,3 +103,15 @@ Running log of design decisions. Each entry: what was decided, what was consider
 **Why:** reranking exists because bi-encoder retrieval scores query and chunk vectors that were computed independently ("same topic"), while a reranker reads them together ("actually answers this"); listwise is the judging mode that matches that purpose at the lowest call count, and the RRF fallback caps its blast radius.
 
 **Known limitation:** LLM listwise ranking carries mild positional bias (earlier candidates slightly favored); accepted at this scale rather than mitigated with shuffled multi-pass voting.
+
+## D15 — No-answer behavior: instructed refusal, measured by a trap question; structured citations (2026-07-13)
+
+**Decision:** The generation prompt hard-scopes Claude to the retrieved context: answer only from it, and refuse explicitly when the context doesn't contain the answer. Enforcement is measured, not trusted — the golden set includes a plausible, domain-appropriate **trap question** that is genuinely unanswerable from the manual, and the eval checks that the pipeline refuses it. Citations: the API returns `sources` as a structured array of `{page, section, snippet}` for the chunks that survived reranking (the authoritative, eval-checkable field), and the answer text cites pages inline where natural.
+
+**Considered:**
+- *Instructed refusal + trap question* — chosen: puts the judgment where the calibration lives (the LLM can genuinely assess "this context doesn't cover that"), costs no extra call, and becomes a measured property.
+- *Retrieval-score gate* — reject early when top scores are low; sounds principled, but D13's RRF scores are rank-based (`1/(60+rank)`) with no absolute meaning to threshold, and calibrating a cosine cutoff on 8–10 questions is the same overfitting trap as tuning fusion weights. Rejected.
+- *LLM relevance pre-check* — an extra call judging "can this context answer this?" duplicates a judgment the generator can make in the same breath. Rejected.
+- *Inline-only or structured-only citations* — inline-only is unparseable for the eval; structured-only gives the human reader no pointers. Rejected.
+
+**Why:** top-k retrieval always returns k chunks — there is no built-in "nothing relevant" signal — so an ungated pipeline will confidently synthesize answers to questions the corpus never covers; in a field-service setting a confident wrong maintenance instruction is the worst failure mode, so refusal must be a designed, measured behavior.
