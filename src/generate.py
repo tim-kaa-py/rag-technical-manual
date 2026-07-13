@@ -61,8 +61,24 @@ def sources_from(chunks: list[NodeWithScore]) -> list[Source]:
     ]
 
 
-def answer(question: str) -> RagAnswer:
-    chunks = retrieve(question)
+def _answer_text(response) -> str:
+    """Extract the answer text; fail loudly on truncation or an empty answer.
+
+    Adaptive thinking shares the max_tokens budget — truncation mid-thinking
+    leaves no text block, and a silent empty answer with confident sources is
+    exactly the failure mode D15 exists to prevent.
+    """
+    text = next((b.text for b in response.content if b.type == "text"), "")
+    if response.stop_reason == "max_tokens" or not text.strip():
+        raise RuntimeError(
+            f"generation incomplete: stop_reason={response.stop_reason!r}, text_chars={len(text)}"
+        )
+    return text
+
+
+def answer_from_chunks(question: str, chunks: list[NodeWithScore]) -> RagAnswer:
+    """Generate from caller-supplied context — the seam where M2 judges the
+    as-logged context (D17) and M3 inserts fuse+rerank before generation."""
     client = anthropic.Anthropic()
     # Sonnet 5: no temperature/top_p/top_k (400); thinking omitted = adaptive.
     response = client.messages.create(
@@ -71,8 +87,11 @@ def answer(question: str) -> RagAnswer:
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": build_prompt(question, chunks)}],
     )
-    text = next((b.text for b in response.content if b.type == "text"), "")
-    return RagAnswer(answer=text, sources=sources_from(chunks))
+    return RagAnswer(answer=_answer_text(response), sources=sources_from(chunks))
+
+
+def answer(question: str) -> RagAnswer:
+    return answer_from_chunks(question, retrieve(question))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,9 @@
+from types import SimpleNamespace
+
+import pytest
 from llama_index.core.schema import NodeWithScore, TextNode
 
-from src.generate import build_prompt, sources_from
+from src.generate import _answer_text, build_prompt, sources_from
 
 
 def _chunk(text: str, page: str, section: str, score: float = 0.9) -> NodeWithScore:
@@ -27,3 +30,31 @@ def test_sources_from_preserves_order_and_truncates_snippets():
     assert [s.page for s in sources] == ["43", "49"]
     assert sources[0].section == "5.6 Fuel"
     assert len(sources[0].snippet) <= 203  # 200 chars + ellipsis
+
+
+def _response(blocks, stop_reason="end_turn"):
+    return SimpleNamespace(content=blocks, stop_reason=stop_reason)
+
+
+def test_answer_text_skips_thinking_blocks_and_returns_text():
+    resp = _response(
+        [
+            SimpleNamespace(type="thinking"),
+            SimpleNamespace(type="text", text="Use EN590 fuel (p. 43)."),
+        ]
+    )
+    assert _answer_text(resp) == "Use EN590 fuel (p. 43)."
+
+
+def test_answer_text_raises_when_thinking_consumed_the_whole_budget():
+    # adaptive thinking shares max_tokens; truncation mid-thinking leaves no
+    # text block — that must fail loudly, never ship as an empty answer
+    resp = _response([SimpleNamespace(type="thinking")], stop_reason="max_tokens")
+    with pytest.raises(RuntimeError, match="max_tokens"):
+        _answer_text(resp)
+
+
+def test_answer_text_raises_on_empty_text_block():
+    resp = _response([SimpleNamespace(type="text", text="  ")])
+    with pytest.raises(RuntimeError):
+        _answer_text(resp)
