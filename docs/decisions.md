@@ -115,3 +115,16 @@ Running log of design decisions. Each entry: what was decided, what was consider
 - *Inline-only or structured-only citations* — inline-only is unparseable for the eval; structured-only gives the human reader no pointers. Rejected.
 
 **Why:** top-k retrieval always returns k chunks — there is no built-in "nothing relevant" signal — so an ungated pipeline will confidently synthesize answers to questions the corpus never covers; in a field-service setting a confident wrong maintenance instruction is the worst failure mode, so refusal must be a designed, measured behavior.
+
+## D16 — Model tiers: one Claude model per pipeline role (2026-07-13)
+
+**Decision:** Tier matched to task profile — **Sonnet 5** (`claude-sonnet-5`) for answer generation and the F5 vision caption; **Haiku 4.5** (`claude-haiku-4-5`) for the listwise reranker; **Opus 4.8** (`claude-opus-4-8`) for the LLM-as-judge.
+
+**Considered:**
+- *Per-role mix* — chosen: generation is constrained synthesis over provided context (Sonnet territory); reranking is a narrow judgment in the latency path on every query (Haiku's profile); the judge should be at least as strong as the system it grades and runs rarely (top tier, cost irrelevant).
+- *Sonnet 5 everywhere* — simplest config, but the judge then grades its own model's outputs — the worst case for self-preference bias. Rejected.
+- *Opus 4.8 everywhere* — maximal quality, but no per-role reasoning and the slowest model in the reranking latency path. Rejected.
+
+**Why:** at this corpus and query volume the cost difference is cents — the value of the mix is the discipline: each call sized to its task, with an eval-guarded swap trigger. Opus-as-judge over Sonnet-as-generator also avoids a model judging itself (same-vendor bias remains and is stated openly as a limitation of the eval design).
+
+**Named swap trigger:** if M3 shows Haiku reranking with a zero or negative delta, swap the reranker to Sonnet 5 (one string) and re-measure before concluding reranking doesn't help.
