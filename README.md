@@ -19,9 +19,11 @@ docker run -d --name rag-pg -p 5433:5432 \
   pgvector/pgvector:pg17
 
 # 4. Run (modules built incrementally — see docs/requirements.md milestones)
-uv run python -m src.ingest
-uv run uvicorn api.main:app --reload
-uv run python -m eval.run
+uv run python -m src.ingest                       # parse, chunk, embed, load pgvector
+uv run python -m src.retrieve "Which fuel standard does the generator require?"
+uv run python -m src.generate "Which fuel standard does the generator require?"
+uv run uvicorn api.main:app --reload              # M4
+uv run python -m eval.run                         # M2
 ```
 
 ## Data
@@ -33,4 +35,4 @@ The corpus is **not** committed (copyrighted manuals / local assets, gitignored)
 
 ## Stack rationale
 
-Summarised in `CLAUDE.md`; full decision log with alternatives in `docs/requirements.md` §4.
+Summarised in `CLAUDE.md`; running decision log with alternatives in `docs/decisions.md` (spec-time decisions in `docs/requirements.md` §4).
