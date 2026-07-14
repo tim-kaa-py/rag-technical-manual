@@ -37,6 +37,22 @@ Design principles:
   near-duplicate 50/50 coolant mention (q2) — so a surprising score on those
   rows is diagnosable instead of misleading.
 
+## Retrieval metrics (`eval/metrics.py`)
+
+Two numbers per question over the retrieved top-5 chunk pages (D17):
+
+- **hit@5** — *selection*: did any expected page make the top-5 at all? The
+  recall question; a miss here means generation never saw the answer.
+- **MRR@5** — *ordering*: reciprocal rank of the first matching chunk
+  (1-based; chunks define rank, not distinct pages; RR = 0 on a miss). This is
+  the metric a reranker (M3) can move without changing hit@5.
+- **pages-found x/y** — coverage readout for multi-page questions (q4 spans
+  pp. 46–47): how many expected pages appeared anywhere in the top-5.
+
+Aggregates are reported as **counts (e.g. 7/11), never percentages** — at
+n=11 a single question moves an aggregate ~9 points, and a percentage with
+decimals would fake precision the sample size cannot support (D17).
+
 ## Files
 
 - `eval/golden.py` — `GoldenQuestion` (frozen dataclass) + `load_golden()`,
