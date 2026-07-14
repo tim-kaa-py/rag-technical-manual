@@ -53,6 +53,36 @@ Aggregates are reported as **counts (e.g. 7/11), never percentages** — at
 n=11 a single question moves an aggregate ~9 points, and a percentage with
 decimals would fake precision the sample size cannot support (D17).
 
+## The LLM judge (`eval/judge.py`)
+
+`claude-opus-4-8` (D16 — a tier above the Sonnet generator), **two binary
+axes in two separate calls**, each with information deliberately withheld:
+
+- **Groundedness** — reference-free: is every claim in the answer supported by
+  the retrieved excerpts? The golden answer is *withheld* so the judge cannot
+  pass a claim that matches the reference but is absent from the context.
+  Hedged claims ("typically…") count as claims; an explicit refusal is
+  grounded if the excerpts indeed lack the information.
+- **Correctness** — reference-based: does the answer agree with the
+  hand-written golden answer? The context is *withheld*; paraphrase is fine,
+  factual conflict or a missing core fact fails, and refusing when the
+  reference has a real answer fails.
+- **Refusal** (trap only): did the system explicitly decline? Declining while
+  still supplying a substantive answer ("the manual does not say, but
+  typically X") counts as an attempt in disguise — fail.
+
+Reading the two axes together: grounded∧¬correct → retrieval failure;
+¬grounded∧correct → the model answered from parametric knowledge (the exact
+failure D15's refusal rule exists to prevent).
+
+Instrument hardening (D17): the judge returns strict JSON with the
+**justification field before the verdict field** (generation is
+autoregressive — verdict-first yields a snap judgment plus rationalization);
+a parse failure retries once and then **fails the whole run** — no silent
+fallback. Prompts are versioned (`JUDGE_PROMPT_VERSION`) and recorded in every
+run log. Unit tests cover parsing and the withholding guarantees; no test
+makes a paid API call.
+
 ## Files
 
 - `eval/golden.py` — `GoldenQuestion` (frozen dataclass) + `load_golden()`,
