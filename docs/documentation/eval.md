@@ -88,8 +88,20 @@ makes a paid API call.
 ## Running it (`eval/run.py`)
 
 ```bash
-uv run python -m eval.run --embed small   # or large
+uv run python -m eval.run --mode dense --embed small    # M2 baseline config
+uv run python -m eval.run --mode hybrid --embed small   # M3: dense+BM25, RRF
+uv run python -m eval.run --mode rerank --embed small   # M3: fused + Haiku rerank
 ```
+
+The retrieval mode is a registry (`MODES`): each mode is a first-class,
+comparable config with its own `config_label` (`rerank-small` etc.).
+Hybrid/rerank rows additionally log the 10-deep fused candidate list
+(node_id + page + score — D23 instrumentation), per-arm top-10 pages and
+sparse scores (so "BM25 moved this row" is demonstrable and zero-score
+sparse padding is visible), and a `rerank_fallback` flag. Rerank runs record
+`rerank_model` in the artifact and report header — after a D16 model swap,
+two runs stay distinguishable by content, not directory — and the report
+names any fallback rows (they contribute zero rerank delta by construction).
 
 Per question: **retrieve once → log the exact context → generate from it →
 judge the logged context** (D17 "as-logged" — re-retrieving between generation

@@ -14,17 +14,44 @@ from pathlib import Path
 from eval.golden import load_golden
 from eval.judge import JUDGE_PROMPT_VERSION, judge_correctness, judge_groundedness, judge_refusal
 from eval.metrics import hit, pages_found, reciprocal_rank
-from src.config import DEFAULT_EMBED, EMBED_CONFIGS, GENERATION_MODEL, JUDGE_MODEL
+from src.config import (
+    DEFAULT_EMBED,
+    EMBED_CONFIGS,
+    GENERATION_MODEL,
+    JUDGE_MODEL,
+    RERANK_MODEL,
+    TOP_K,
+)
 from src.generate import answer_from_chunks, format_context
+from src.hybrid import arm_results, hybrid_candidates
+from src.rerank import rerank
 from src.retrieve import retrieve
 
 RESULTS_DIR = Path(__file__).parent / "results"
 
 
-def run_eval(embed: str = DEFAULT_EMBED) -> dict:
+def _dense(question: str, embed: str):
+    return retrieve(question, embed=embed), None, None, False
+
+
+def _hybrid(question: str, embed: str):
+    cands = hybrid_candidates(question, embed)
+    return cands[:TOP_K], cands, arm_results(question, embed), False
+
+
+def _rerank(question: str, embed: str):
+    cands = hybrid_candidates(question, embed)
+    result = rerank(question, cands)
+    return result.chunks, cands, arm_results(question, embed), result.fallback
+
+
+MODES = {"dense": _dense, "hybrid": _hybrid, "rerank": _rerank}
+
+
+def run_eval(mode: str = "dense", embed: str = DEFAULT_EMBED) -> dict:
     rows = []
     for q in load_golden():
-        chunks = retrieve(q.question, embed=embed)
+        chunks, candidates, arms, fell_back = MODES[mode](q.question, embed)
         context = format_context(chunks)  # as-logged (D17)
         rag = answer_from_chunks(q.question, chunks)
         pages = [c.node.metadata["page"] for c in chunks]
@@ -34,12 +61,32 @@ def run_eval(embed: str = DEFAULT_EMBED) -> dict:
             "question": q.question,
             "expected_pages": q.expected_pages,
             "retrieved_pages": pages,
+            # D23 instrumentation: 10-deep fused candidates, identity-bearing
+            "candidates": (
+                [
+                    {
+                        "node_id": c.node.node_id,
+                        "page": c.node.metadata["page"],
+                        "score": round(c.score or 0.0, 4),
+                    }
+                    for c in candidates
+                ]
+                if candidates is not None
+                else None
+            ),
+            "rerank_fallback": fell_back,
             "answer": rag.answer,
             "context": context,
             "annotation": q.annotation,
             "trap": q.trap,
             "golden_answer": q.golden_answer,
         }
+        if arms is not None:
+            # per-arm top-10 pages + sparse scores: makes "BM25 moved this row"
+            # demonstrable, and zero-score sparse padding visible
+            row["dense_pages"] = [c.node.metadata["page"] for c in arms["dense"]]
+            row["sparse_pages"] = [c.node.metadata["page"] for c in arms["sparse"]]
+            row["sparse_scores"] = [round(c.score or 0.0, 4) for c in arms["sparse"]]
         if q.trap:
             refusal = judge_refusal(rag.answer)
             row |= {"refused": refusal.passed, "refusal_justification": refusal.justification}
@@ -61,9 +108,12 @@ def run_eval(embed: str = DEFAULT_EMBED) -> dict:
     return {
         "date": datetime.date.today().isoformat(),
         "embed": embed,
-        # config_label is the run's identity: M3 adds fused/reranked configs on the
-        # same embed tier, and filenames/compare headers must not collide then
-        "config_label": f"dense-{embed}",
+        "mode": mode,
+        # config_label is the run's identity: filenames/compare headers must not collide
+        "config_label": f"{mode}-{embed}",
+        # provenance lives in the artifact: after a D16 swap, two rerank runs
+        # must be distinguishable by content, not directory
+        "rerank_model": RERANK_MODEL if mode == "rerank" else None,
         "embed_model": EMBED_CONFIGS[embed]["model"],
         "generation_model": GENERATION_MODEL,
         "judge_model": JUDGE_MODEL,
@@ -88,6 +138,7 @@ def write_report(run: dict, out_dir: Path = RESULTS_DIR) -> Path:
     scored = [r for r in run["rows"] if not r["trap"]]
     trap_rows = [r for r in run["rows"] if r["trap"]]
     n = len(scored)
+    fallback_ids = [r["id"] for r in run["rows"] if r.get("rerank_fallback")]
     predicted_fail = sum(1 for r in scored if "predicted fail" in (r["annotation"] or ""))
     hits = sum(r["hit"] for r in scored)
     grounded = sum(r["grounded"] for r in scored)
@@ -106,6 +157,20 @@ def write_report(run: dict, out_dir: Path = RESULTS_DIR) -> Path:
         " (drafted knowing the M1 smoke results).",
         f"- Predicted-fail ceiling: {predicted_fail} scored rows cannot pass correctness"
         f" by design (D9/D19/D6) — best achievable correct = {n - predicted_fail}/{n}.",
+        *(
+            [
+                f"- Reranker: `{run['rerank_model']}`."
+                + (
+                    f" Fallbacks: {len(fallback_ids)}/{len(run['rows'])} rows kept RRF order"
+                    f" ({', '.join(fallback_ids)}) — these rows contribute zero rerank delta"
+                    " by construction; the delta over non-fallback rows is the honest readout."
+                    if fallback_ids
+                    else f" No fallbacks — all {len(run['rows'])} rankings parsed."
+                )
+            ]
+            if run.get("rerank_model")
+            else []
+        ),
         "",
         "| id | type | expected | retrieved (rank order) | hit | RR | pages | grounded | correct | annotation |",
         "|---|---|---|---|---|---|---|---|---|---|",
@@ -229,6 +294,7 @@ def compare(path_a: Path, path_b: Path) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--embed", default=DEFAULT_EMBED, choices=list(EMBED_CONFIGS))
+    parser.add_argument("--mode", default="dense", choices=list(MODES))
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--calibrate", type=Path, default=None, metavar="RUN_JSON")
     group.add_argument("--compare", type=Path, nargs=2, default=None, metavar=("A_JSON", "B_JSON"))
@@ -238,5 +304,5 @@ if __name__ == "__main__":
     elif args.compare:
         compare(*args.compare)
     else:
-        path = write_report(run_eval(args.embed))
+        path = write_report(run_eval(args.mode, args.embed))
         print(f"report: {path}")
