@@ -128,6 +128,19 @@ the 10 fused candidates (the reranker's input); `arm_results()` exposes
 per-arm top-10s for eval instrumentation only. Retrievers are cached per
 embed tier for the process lifetime (D12: rebuild at startup). (D12, D13)
 
+### `rerank.py` — listwise reranking of the fused candidates (M3)
+One `claude-haiku-4-5` call (D16) receives the question plus all 10 fused
+candidates and returns the top-5 numbers as strict JSON — listwise, because
+judging candidates *against each other* is the actual task, at one call.
+Bi-encoder retrieval scores "same topic"; the reranker reads question and
+chunk together — "actually answers this". Parse failures **and** API errors
+fall back to the RRF order (`RerankResult.fallback = True`): a serving-path
+stage degrades gracefully, never breaks a query (D14) — the opposite
+asymmetry of the eval judge, which fails loudly. The prompt shows section
+labels but withholds page numbers (D20: noise, and an uncontrolled
+"front-matter" signal). M4 note: serve from `rerank()` directly —
+`rerank_retrieve()` discards the fallback flag. (D14, D16)
+
 ### `generate.py` — chunks → grounded, sourced answer
 The payoff. Hand-rolls the prompt (rather than using a LlamaIndex query engine)
 so *every line the model sees is explainable* (N1). The `SYSTEM_PROMPT` enforces
