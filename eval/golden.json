@@ -1,0 +1,110 @@
+[
+  {
+    "id": "q1",
+    "qtype": "lexical",
+    "question": "Which fuel standards must the fuel used in the generator comply with?",
+    "expected_pages": ["43"],
+    "golden_answer": "The fuel must comply with one of the following standards: EN590, ASTM D975 NO 1-D/2-D, JIS K2204 TYPE 1,2,3, ISO 8217 DMX-CLASS, DIN 51601 DIESEL FUEL, or BS 2869 CLASS-A1, A2.",
+    "annotation": null,
+    "trap": false
+  },
+  {
+    "id": "q2",
+    "qtype": "semantic",
+    "question": "How should the coolant mixture be prepared if freezing is a risk?",
+    "expected_pages": ["42"],
+    "golden_answer": "Use 50% antifreeze (glycol) and 50% pure water as the coolant mixture; this protects the engine down to -40°C. At least 40% antifreeze is recommended for corrosion protection, and the mixture should be prepared in a separate tank before filling the cooling system.",
+    "annotation": "known near-duplicate: p. 47 (re-commissioning) also mentions the 50/50 ratio but does not answer the freezing-risk question — a p. 47-only retrieval is an ambiguous-source miss, not a retrieval failure",
+    "trap": false
+  },
+  {
+    "id": "q3",
+    "qtype": "two-sections-one-page",
+    "question": "After how many years must the maintenance-free batteries be replaced?",
+    "expected_pages": ["43"],
+    "golden_answer": "The maintenance-free batteries can be used for approximately 4 years and must be replaced after that.",
+    "annotation": "two sections share the page — page-level hit cannot distinguish them (D17 known limitation)",
+    "trap": false
+  },
+  {
+    "id": "q4",
+    "qtype": "cross-page",
+    "question": "What has to be done to store the generator set for more than 6 months?",
+    "expected_pages": ["46", "47"],
+    "golden_answer": "Before storage, operate the set until nominal operating temperature (75°C) and check for failures. Then: drain the engine oil and fill with diesel-engine protective oil up to the dipstick maximum; run the engine on a mixture of 1/3 protective oil (JIS K2246 NP9) and 2/3 diesel until 2 litres are consumed; drain the fuel system and reconnect the fuel intake and return canals to their normal location; drain and clean the fuel tank; drain the protective oil from the engine and filter; spray protective oil into the air intake manifold, the compressor side of the turbocharger, and — with the cylinder head covers disassembled — onto valves, valve springs, valve guides, cylinder head and rocker arms; seal the air inlet and exhaust outlet; loosen the V-belts; disconnect the battery cables and keep the battery under continuous charge; clean the generator with a wet cloth (no pressurized water); check the electrical connections and terminals; apply moisture repellent to the electrical system; cover the generator and post a warning sign on it; store in a dry place protected from sunlight, rain and temperature changes.",
+    "annotation": "section 5.10 spans two pages — per-question column reports pages found x/y",
+    "trap": false
+  },
+  {
+    "id": "q5",
+    "qtype": "table-displaced",
+    "question": "How does high fuel sulphur content affect the oil change interval?",
+    "expected_pages": ["43"],
+    "golden_answer": "If the fuel sulphur content exceeds 0.5%, the engine oil must be changed more frequently: between 0.5% and 1.0% sulphur the interval drops to 0.75 of the normal interval, and above 1.0% to 0.5 (half) of the normal interval.",
+    "annotation": "the sulphur table extracts displaced to the page end — tests robustness to extraction order. CAUTION: the manual's third table row misprints '<1,0' where '>1,0' is meant (as printed it contradicts row one); golden keeps the correct engineering reading — judge results on this question must tolerate either phrasing of the >1.0% row, and a groundedness fail here may reflect the misprint, not the system",
+    "trap": false
+  },
+  {
+    "id": "q6",
+    "qtype": "lexical-numeric",
+    "question": "What is the maximum permissible grounding resistance for the generator set?",
+    "expected_pages": ["33"],
+    "golden_answer": "The grounding resistance must not be more than 20 Ohms.",
+    "annotation": null,
+    "trap": false
+  },
+  {
+    "id": "q7",
+    "qtype": "predicted-fail",
+    "question": "At what interval should the V-belt tension be checked?",
+    "expected_pages": ["48"],
+    "golden_answer": "The tension of the V-belts must be checked at start-up, every 200 hours of engine running, and at least once every year.",
+    "annotation": "predicted fail — D9: the p. 48 maintenance-schedule table extracts as shredded text with row-to-interval associations lost",
+    "trap": false
+  },
+  {
+    "id": "q8",
+    "qtype": "predicted-fail",
+    "question": "The engine cranks slowly and will not start. What are the possible causes?",
+    "expected_pages": ["49"],
+    "golden_answer": "Possible causes for 'engine turns slow, but does not start': de-charged batteries; defective starter; unsuitable oil specification; no fuel in the tank; air in the fuel system; inoperative fuel solenoid; clogged oil filter; defective manual fuel lift pump; defective fuel injection pump; poor compression; engine mechanical fault (piston, piston rings etc.); defective control unit; problem in the control panel; problems with electrical connections.",
+    "annotation": "predicted fail — D19: the troubleshooting table is an image (this row on the p. 49 image; the table continues as images on pp. 50-51); only the 6.1 General intro text extracts",
+    "trap": false
+  },
+  {
+    "id": "q9",
+    "qtype": "predicted-fail",
+    "question": "Which SAE oil grade should be used at an ambient temperature of -30°C?",
+    "expected_pages": ["42"],
+    "golden_answer": "SAE 5W/30 — in the lubricant chart it is the only grade whose range covers -30°C (SAE 10W/30 reaches only down to -25°C and SAE 15W/40 only to -15°C).",
+    "annotation": "predicted fail — D6: the answer exists only in the SAE chart image on p. 42; M5 target",
+    "trap": false
+  },
+  {
+    "id": "q10",
+    "qtype": "identifier",
+    "question": "What is the DKG-090 and what is it used for?",
+    "expected_pages": ["36"],
+    "golden_answer": "The DKG-090 is an external GSM-GPRS modem (DIN-rail mounted, quad-band 850/900/1800/1900 MHz, 12/24 V DC supply options) that provides remote monitoring capability for the TJ509-T controller.",
+    "annotation": "identifier lookup — M3 hybrid headroom (D12 sparse-wins case)",
+    "trap": false
+  },
+  {
+    "id": "q11",
+    "qtype": "lexical-numeric",
+    "question": "What is the minimum power factor required for the load connected to the generator set?",
+    "expected_pages": ["30"],
+    "golden_answer": "The power factor of the connected load must be inductive and at least 80% (0.8) for optimum operating conditions. A lower inductive power factor causes overloading problems; capacitive power factor values may cause overvoltage problems on the alternator windings.",
+    "annotation": "numeric lookup — M3 hybrid headroom + page-spread (only scored question on p. 30)",
+    "trap": false
+  },
+  {
+    "id": "q12",
+    "qtype": "trap",
+    "question": "What is the tightening torque for the cylinder head bolts?",
+    "expected_pages": [],
+    "golden_answer": "",
+    "annotation": "trap — no torque specification anywhere in the corpus: text grep finds 'torque' only in the p. 9 towing-trailer section (no value), and all 60 pages were visually verified free of torque values (independent reviewer pass); expected behavior: explicit refusal (D15)",
+    "trap": true
+  }
+]
