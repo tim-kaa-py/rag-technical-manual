@@ -1,6 +1,6 @@
 # Code Documentation — M1 Core RAG Spine
 
-_Last updated: 2026-07-14 · reflects milestone M1 + the M2 embedding-A/B seam_
+_Last updated: 2026-07-14 · reflects milestone M3 + the M4 serving hooks (`warm()`, `GenerationIncompleteError`)_
 
 This document maps every file in the codebase and explains what it does and why.
 It reflects the **M1** state: the straight-line path from a PDF to a grounded,
@@ -126,7 +126,9 @@ via an LLM). Fusion dedups by `node.hash` (text + metadata) — which is why
 `load_nodes`' exact reconstruction matters. `hybrid_candidates()` returns
 the 10 fused candidates (the reranker's input); `arm_results()` exposes
 per-arm top-10s for eval instrumentation only. Retrievers are cached per
-embed tier for the process lifetime (D12: rebuild at startup). (D12, D13)
+embed tier for the process lifetime (D12: rebuild at startup); `warm()`
+builds them eagerly so the API's first query doesn't pay index-build
+latency. (D12, D13)
 
 ### `rerank.py` — listwise reranking of the fused candidates (M3)
 One `claude-haiku-4-5` call (D16) receives the question plus all 10 fused
@@ -158,7 +160,9 @@ Two things worth noting:
 - **`_answer_text`** fails *loudly* on a truncated or empty response. Adaptive
   thinking shares the token budget, so a cutoff mid-thinking can leave zero
   answer text — and "empty answer next to confident-looking sources" is exactly
-  the failure D15 exists to prevent, so it raises instead of shipping it.
+  the failure D15 exists to prevent, so it raises instead of shipping it. It
+  raises `GenerationIncompleteError` (a `RuntimeError` subclass) so the M4 API
+  can map exactly this under-delivery to 502 without catching our own bugs.
 
 ## The tests (`tests/`)
 

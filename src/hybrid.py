@@ -51,6 +51,12 @@ def arm_results(question: str, embed: str = DEFAULT_EMBED) -> dict[str, list[Nod
     return {"dense": dense.retrieve(question), "sparse": sparse.retrieve(question)}
 
 
+def warm(embed: str = DEFAULT_EMBED) -> None:
+    """Build the cached retrievers eagerly (D12: BM25 rebuilt at process
+    start) so the first query doesn't pay index-build latency."""
+    _fusion_retriever(embed)
+
+
 if __name__ == "__main__":
     question = (
         " ".join(sys.argv[1:])

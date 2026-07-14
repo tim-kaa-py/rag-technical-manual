@@ -66,6 +66,12 @@ def sources_from(chunks: list[NodeWithScore]) -> list[Source]:
     ]
 
 
+class GenerationIncompleteError(RuntimeError):
+    """Raised when the model under-delivered (truncation, empty text) — the
+    D15 loud-failure guard. A distinct type so the API can map exactly this
+    to 502 without swallowing library RuntimeErrors (our bugs stay 500s)."""
+
+
 def _answer_text(response) -> str:
     """Extract the answer text; fail loudly on truncation or an empty answer.
 
@@ -75,7 +81,7 @@ def _answer_text(response) -> str:
     """
     text = next((b.text for b in response.content if b.type == "text"), "")
     if response.stop_reason == "max_tokens" or not text.strip():
-        raise RuntimeError(
+        raise GenerationIncompleteError(
             f"generation incomplete: stop_reason={response.stop_reason!r}, text_chars={len(text)}"
         )
     return text
