@@ -4,10 +4,10 @@ _Last updated: 2026-07-14 · reflects milestone M1_
 
 This document maps every file in the codebase and explains what it does and why.
 It reflects the **M1** state: the straight-line path from a PDF to a grounded,
-sourced answer. Decision IDs (`D9`, `D11`, …) reference [decisions.md](decisions.md);
+sourced answer. Decision IDs (`D9`, `D11`, …) reference [decisions.md](../decisions.md);
 that log is the source of truth for the *why* behind each choice.
 
-To set up and run the pipeline, see the Quickstart in the [README](../README.md#quickstart).
+To set up and run the pipeline, see the Quickstart in the [README](../../README.md#quickstart).
 
 The pipeline has two phases:
 
@@ -26,7 +26,7 @@ Listed in execution order.
 
 ### `config.py` — single source of constants
 Everything tunable lives here, and every constant is tagged with the decision
-ID that fixed it (traceable to [decisions.md](decisions.md)):
+ID that fixed it (traceable to [decisions.md](../decisions.md)):
 
 - Chunk size / overlap: **512 / 64** (D9)
 - `TOP_K = 5` retrieved chunks (D13)

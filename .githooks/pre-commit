@@ -1,26 +1,47 @@
 #!/usr/bin/env bash
-# Docs freshness detector (see docs/superpowers/specs/2026-07-14-doc-freshness-automation-design.md).
-# Blocks a commit that changes src/ Python without updating the engineering doc.
-# Deliberately dumb: it only knows "src changed, doc didn't" — not whether the
-# change needed doc work. Bypass a genuine false positive with: git commit --no-verify
+# Docs freshness detector (table-driven). Each code area must keep its doc in
+# sync: a commit that changes <folder>/ must also stage <doc>. Deliberately
+# dumb — it only knows "<folder> changed, its doc didn't", never whether the
+# change needed doc work. Bypass a genuine false positive with:
+#   git commit --no-verify
 set -euo pipefail
 
-staged=$(git diff --cached --name-only --diff-filter=ACM)
-src_changed=$(printf '%s\n' "$staged" | grep -E '^src/.*\.py$' || true)
-doc_staged=$(printf '%s\n' "$staged" | grep -Fx 'docs/documentation.md' || true)
+# folder|doc pairs. Add a line to cover a new code area.
+PAIRS=(
+  "src|docs/documentation/src.md"
+  "eval|docs/documentation/eval.md"
+  "api|docs/documentation/api.md"
+)
 
-if [ -n "$src_changed" ] && [ -z "$doc_staged" ]; then
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+blocked=0
+
+for pair in "${PAIRS[@]}"; do
+  folder="${pair%%|*}"
+  doc="${pair##*|}"
+  changed=$(printf '%s\n' "$staged" | grep -E "^${folder}/.*\.py$" || true)
+  doc_staged=$(printf '%s\n' "$staged" | grep -Fx "$doc" || true)
+  if [ -n "$changed" ] && [ -z "$doc_staged" ]; then
+    if [ "$blocked" -eq 0 ]; then
+      echo "✗ Docs freshness check failed." >&2
+      blocked=1
+    fi
+    {
+      echo ""
+      echo "  ${folder}/ changed but ${doc} did not. Changed files:"
+      printf '%s\n' "$changed" | sed 's/^/    /'
+    } >&2
+  fi
+done
+
+if [ "$blocked" -eq 1 ]; then
   {
-    echo "✗ Docs freshness check: src/ changed but docs/documentation.md did not."
     echo ""
-    echo "  Changed source files:"
-    printf '%s\n' "$src_changed" | sed 's/^/    /'
-    echo ""
-    echo "  Keep the engineering doc current:"
+    echo "  Keep the doc(s) current:"
     echo "    • In a Claude session: run /update-docs"
-    echo "    • Or edit docs/documentation.md yourself"
+    echo "    • Or edit the doc(s) named above yourself"
     echo ""
-    echo "  If this change genuinely needs no doc update, bypass with:"
+    echo "  If these changes genuinely need no doc update, bypass with:"
     echo "    git commit --no-verify"
   } >&2
   exit 1
