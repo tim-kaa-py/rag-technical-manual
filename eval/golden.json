@@ -86,7 +86,7 @@
     "question": "What is the DKG-090 and what is it used for?",
     "expected_pages": ["36"],
     "golden_answer": "The DKG-090 is an external GSM-GPRS modem (DIN-rail mounted, quad-band 850/900/1800/1900 MHz, 12/24 V DC supply options) that provides remote monitoring capability for the TJ509-T controller.",
-    "annotation": "identifier lookup — M3 hybrid headroom (D12 sparse-wins case)",
+    "annotation": "identifier lookup — D12 sparse-wins case; baseline measured dense already at rank 1, so sparse-wins is unconfirmed at n=2 on this set (D23)",
     "trap": false
   },
   {
@@ -95,7 +95,7 @@
     "question": "What is the minimum power factor required for the load connected to the generator set?",
     "expected_pages": ["30"],
     "golden_answer": "The power factor of the connected load must be inductive and at least 80% (0.8) for optimum operating conditions. A lower inductive power factor causes overloading problems; capacitive power factor values may cause overvoltage problems on the alternator windings.",
-    "annotation": "numeric lookup — M3 hybrid headroom + page-spread (only scored question on p. 30)",
+    "annotation": "numeric lookup + page-spread (only scored question on p. 30); baseline measured dense already at rank 1 — no M3 headroom here (D23)",
     "trap": false
   },
   {

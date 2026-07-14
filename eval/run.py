@@ -127,8 +127,9 @@ def write_report(run: dict, out_dir: Path = RESULTS_DIR) -> Path:
         f"**Aggregates (n={n} answerable):** hit@5 = {hits}/{n} · MRR@5 = {mrr:.2f}"
         f" · grounded = {grounded}/{n} · correct = {correct}/{n}",
         "",
-        "Quadrant reading: grounded∧¬correct → retrieval failure;"
-        " ¬grounded∧correct → parametric-knowledge answer (D15's target).",
+        "Quadrant reading: grounded∧¬correct → retrieval-or-corpus failure"
+        " (the row's annotation decides which); ¬grounded∧correct →"
+        " parametric-knowledge answer (D15's target).",
     ]
 
     report = out_dir / f"{stem}.md"
@@ -136,9 +137,43 @@ def write_report(run: dict, out_dir: Path = RESULTS_DIR) -> Path:
     return report
 
 
+def calibrate(run_json: Path) -> None:
+    """One-time judge flip-rate check (D17): re-judge the LOGGED answers and
+    contexts 3x — no re-generation, isolating judge noise from generator
+    noise. The originally logged verdict counts as a fourth sample: three
+    fresh unanimous calls that disagree with the logged verdict are a flip."""
+    run = json.loads(run_json.read_text())
+    flips = 0
+    checks = 0
+    for r in run["rows"]:
+        if r["trap"]:
+            axes = [("refused", r["refused"],
+                     [judge_refusal(r["answer"]).passed for _ in range(3)])]
+        else:
+            axes = [
+                ("grounded", r["grounded"],
+                 [judge_groundedness(r["question"], r["context"], r["answer"]).passed
+                  for _ in range(3)]),
+                ("correct", r["correct"],
+                 [judge_correctness(r["question"], r["golden_answer"], r["answer"]).passed
+                  for _ in range(3)]),
+            ]
+        for name, logged, fresh in axes:
+            checks += 1
+            if len(set(fresh + [logged])) > 1:
+                flips += 1
+                print(f"FLIP {r['id']}/{name}: logged={logged}, fresh={fresh}")
+    print(f"calibration: {flips} flipping axes out of {checks} (logged + 3 fresh each)")
+    print("D17 rule: 0 flips -> single-run judging; otherwise majority-of-3 becomes standing protocol")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--embed", default=DEFAULT_EMBED, choices=list(EMBED_CONFIGS))
+    parser.add_argument("--calibrate", type=Path, default=None, metavar="RUN_JSON")
     args = parser.parse_args()
-    path = write_report(run_eval(args.embed))
-    print(f"report: {path}")
+    if args.calibrate:
+        calibrate(args.calibrate)
+    else:
+        path = write_report(run_eval(args.embed))
+        print(f"report: {path}")

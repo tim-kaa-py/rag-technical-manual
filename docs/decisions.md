@@ -180,3 +180,34 @@ Running log of design decisions. Each entry: what was decided, what was consider
 **Why:** the choice had to be made consciously and before results exist (changing it later re-baselines everything); section-in/page-out is the only option where every embedded token plausibly helps retrieval.
 
 **Note for M3:** the BM25 index must tokenize the same content the dense side embeds (D12 byte-identical invariant) — carry this exclusion over.
+
+## D21 — Spanning-chunk section labels list all contained sections; M2 re-baselined (2026-07-14)
+
+**Decision:** A chunk's `section` label = the section running at its start plus every heading inside it, joined `"; "` (e.g. `5.6 Fuel; 5.7 Maintenance of Batteries`). Since D20 embeds the label, vectors change → the M2 baseline was re-ingested and re-run before being blessed.
+
+**Considered:**
+- *All contained sections, joined* — chosen: honest for spanning chunks in both citations and embedded text; trivially implementable on top of D9's tagging.
+- *Majority heading (by token share)* — a single clean label, but still hides the minority section from citations and requires token accounting. Rejected.
+- *Accept as known limitation with audit metric + trigger* — zero re-baseline cost, but the first baseline review measured the artifact at 3 of 8 correct answers carrying a wrong section label (q2/q3/q5), and it demonstrably cost rank on q3 (the D20-embedded wrong label boosted a no-answer continuation chunk over the answer chunk). Rejected.
+
+**Why:** the label is both a citation (F1's `(page, section)` promise) and embedded retrieval signal (D20) — a wrong label is user-visible *and* rank-distorting. Fixing it mid-M3 would invalidate the baseline; fixing before blessing costs one $1 re-run.
+
+## D22 — Degenerate chunks (< 20 chars) dropped at chunking (2026-07-14)
+
+**Decision:** `build_nodes` drops chunks whose stripped text is shorter than 20 characters. Effect: the pp. 50–51 image-only pages (extract as just their footer number, D19) no longer produce index rows; 82 chunks → 80.
+
+**Considered:**
+- *Drop at chunking* — chosen: "no content-free chunk enters the index" is a chunking-stage invariant; folded into the D21 re-baseline at zero extra cost.
+- *Keep them (measured harmless)* — they never appeared in any top-5, but they pollute the index, can surface as absurd citations, and would receive BM25 scores in M3. Rejected.
+
+**Why:** a 2-character chunk can never ground an answer; removing it is strictly hygiene, and doing it inside the same re-baseline avoids a second vector change later.
+
+## D23 — Baseline record amendments: D12 headroom relocated, M5 delta expectations pre-committed (2026-07-14)
+
+**Decision:** Post-review amendments to the frozen record (annotations only — no question, page set, or golden answer changed): (1) D12's sparse-wins hypothesis is *unconfirmed at n=2* — dense resolved both identifier rows (q10, q11) at rank 1; M3's measurable headroom is ranking depth on q3/q5/q7 (MRR ceiling 0.91 vs measured baseline) plus demoting the TOC-magnet chunk (p. 5, in 4 of 12 top-5s), while hit@5 is immovable before M5 (q8 has no text to retrieve). (2) M5 delta expectations: q8 → hit + correctness; q9 → correctness only (its retrieval is already saturated — p. 42 at rank 1 with the answer in an invisible chart). (3) An M3 null result triggers the D16 Haiku→Sonnet reranker check before any "reranking doesn't help" conclusion.
+
+**Considered:**
+- *Pre-commit expectations now* — chosen: written before M3/M5 exist, so a small delta reads as instrument saturation, not failed work — and a large delta can't be retro-fitted a story.
+- *Interpret after M3 runs* — flexible, but post-hoc reading of a near-saturated instrument invites motivated reasoning in either direction. Rejected.
+
+**Why:** D17's freeze discipline applies to expectations too: the honest statement of where improvement *can* appear must predate the measurement that shows it.

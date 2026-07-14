@@ -35,3 +35,6 @@ outputs/
 # Raw eval run logs: contain full manual text (copyrighted corpus, same
 # reason data/ is ignored). The .md reports carry no chunk text and ARE committed.
 eval/results/*.json
+
+# Superseded local run artifacts (pre-re-baseline)
+eval/results/superseded/

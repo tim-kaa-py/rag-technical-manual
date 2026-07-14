@@ -69,10 +69,15 @@ citation label at worst — it never breaks a chunk boundary.
 
 ### `chunking.py` — Documents → tagged TextNodes
 Runs LlamaIndex's `SentenceSplitter` (512/64) to cut pages into chunks, then
-walks the chunks in order assigning each a `section`: the most recent heading
-seen at that chunk's *start*. A heading appearing mid-chunk updates the running
-section for *following* chunks. Text before any heading is tagged `"unknown"`.
-Output: `TextNode`s each carrying `{page, section}` plus text.
+walks the chunks in order assigning each a `section` label: the section
+running at the chunk's start **plus every heading inside the chunk**, joined
+`"; "` (D21) — a chunk spanning a heading belongs to both sections, and
+labeling only the first mislabels the content after the heading (a citation
+and ranking artifact found in the M2 baseline review). Headings inside a
+chunk update the running section for *following* chunks. Text before any
+heading is tagged `"unknown"`. Chunks shorter than 20 characters are dropped
+(D22 — image-only pages extract as just their footer number). Output:
+`TextNode`s each carrying `{page, section}` plus text.
 
 **What gets embedded (D20):** the `section` label is prepended into the text
 that gets embedded (a continuation chunk inherits a heading its body doesn't

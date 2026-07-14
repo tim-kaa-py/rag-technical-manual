@@ -20,13 +20,35 @@ def test_nodes_carry_page_and_section_metadata():
     assert nodes[-1].metadata["section"] == "5.4 Lubrication Oil"
 
 
-def test_section_updates_when_new_heading_appears():
+def test_spanning_chunk_lists_all_contained_sections():
+    # D21: a chunk spanning a heading belongs to BOTH sections — labeling it
+    # only with the section at chunk start mislabels the content after the
+    # heading (the q2/q3/q5 citation artifact found in the M2 baseline review)
     pages = [
         _page("5.4 Lubrication Oil\nOil text.\n5.5 Coolant\nCoolant text.", "42"),
     ]
     nodes = build_nodes(pages)
-    # a short page → one chunk; its section is the heading active at chunk START
-    assert nodes[0].metadata["section"] == "5.4 Lubrication Oil"
+    assert nodes[0].metadata["section"] == "5.4 Lubrication Oil; 5.5 Coolant"
+
+
+def test_continuation_chunk_spanning_a_heading_keeps_running_section_first():
+    pages = [
+        _page("5.4 Lubrication Oil\nOil text on the first page continues.", "42"),
+        _page("More oil text without heading.\n5.5 Coolant\nCoolant text.", "43"),
+    ]
+    nodes = build_nodes(pages)
+    assert nodes[-1].metadata["section"] == "5.4 Lubrication Oil; 5.5 Coolant"
+
+
+def test_degenerate_chunks_from_imageonly_pages_are_dropped():
+    # D22: pp. 50-51 extract as just their footer page number — such chunks
+    # carry no content and only pollute the index and citations
+    pages = [
+        _page("5.4 Lubrication Oil\nUse API CF4 grade oil in the engine.", "42"),
+        _page("50", "50"),
+    ]
+    nodes = build_nodes(pages)
+    assert [n.metadata["page"] for n in nodes] == ["42"]
 
 
 def test_embed_text_excludes_page_and_carries_section_into_continuation_chunks():

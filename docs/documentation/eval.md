@@ -71,7 +71,9 @@ axes in two separate calls**, each with information deliberately withheld:
   still supplying a substantive answer ("the manual does not say, but
   typically X") counts as an attempt in disguise — fail.
 
-Reading the two axes together: grounded∧¬correct → retrieval failure;
+Reading the two axes together: grounded∧¬correct → retrieval-or-corpus
+failure (the row's annotation decides which — e.g. a rank-1 hit on a page
+whose answer sits in an image is a corpus gap, not a retrieval miss);
 ¬grounded∧correct → the model answered from parametric knowledge (the exact
 failure D15's refusal rule exists to prevent).
 
