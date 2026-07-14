@@ -17,17 +17,30 @@ def _verdict(passed: bool) -> SimpleNamespace:
 
 def test_run_eval_and_write_report_agree_on_row_schema(monkeypatch, tmp_path):
     golden = [
-        GoldenQuestion(id="q1", qtype="lexical", question="Which fuel?",
-                       expected_pages=["43"], golden_answer="EN590.",
-                       annotation=None, trap=False),
-        GoldenQuestion(id="q12", qtype="trap", question="Torque?",
-                       expected_pages=[], golden_answer="",
-                       annotation="trap", trap=True),
+        GoldenQuestion(
+            id="q1",
+            qtype="lexical",
+            question="Which fuel?",
+            expected_pages=["43"],
+            golden_answer="EN590.",
+            annotation=None,
+            trap=False,
+        ),
+        GoldenQuestion(
+            id="q12",
+            qtype="trap",
+            question="Torque?",
+            expected_pages=[],
+            golden_answer="",
+            annotation="trap",
+            trap=True,
+        ),
     ]
     monkeypatch.setattr(run_mod, "load_golden", lambda: golden)
     monkeypatch.setattr(run_mod, "retrieve", lambda q, embed=None: [_chunk("43")])
     monkeypatch.setattr(
-        run_mod, "answer_from_chunks",
+        run_mod,
+        "answer_from_chunks",
         lambda q, chunks: SimpleNamespace(answer="EN590 (p. 43).", sources=[]),
     )
     monkeypatch.setattr(run_mod, "judge_groundedness", lambda *a: _verdict(True))

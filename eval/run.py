@@ -29,10 +29,16 @@ def run_eval(embed: str = DEFAULT_EMBED) -> dict:
         rag = answer_from_chunks(q.question, chunks)
         pages = [c.node.metadata["page"] for c in chunks]
         row = {
-            "id": q.id, "qtype": q.qtype, "question": q.question,
-            "expected_pages": q.expected_pages, "retrieved_pages": pages,
-            "answer": rag.answer, "context": context, "annotation": q.annotation,
-            "trap": q.trap, "golden_answer": q.golden_answer,
+            "id": q.id,
+            "qtype": q.qtype,
+            "question": q.question,
+            "expected_pages": q.expected_pages,
+            "retrieved_pages": pages,
+            "answer": rag.answer,
+            "context": context,
+            "annotation": q.annotation,
+            "trap": q.trap,
+            "golden_answer": q.golden_answer,
         }
         if q.trap:
             refusal = judge_refusal(rag.answer)
@@ -45,8 +51,10 @@ def run_eval(embed: str = DEFAULT_EMBED) -> dict:
                 "hit": hit(pages, expected),
                 "rr": reciprocal_rank(pages, expected),
                 "pages_found": pages_found(pages, expected),
-                "grounded": grounded.passed, "grounded_justification": grounded.justification,
-                "correct": correct.passed, "correct_justification": correct.justification,
+                "grounded": grounded.passed,
+                "grounded_justification": grounded.justification,
+                "correct": correct.passed,
+                "correct_justification": correct.justification,
             }
         rows.append(row)
         print(f"{q.id}: done")
@@ -147,16 +155,27 @@ def calibrate(run_json: Path) -> None:
     checks = 0
     for r in run["rows"]:
         if r["trap"]:
-            axes = [("refused", r["refused"],
-                     [judge_refusal(r["answer"]).passed for _ in range(3)])]
+            axes = [
+                ("refused", r["refused"], [judge_refusal(r["answer"]).passed for _ in range(3)])
+            ]
         else:
             axes = [
-                ("grounded", r["grounded"],
-                 [judge_groundedness(r["question"], r["context"], r["answer"]).passed
-                  for _ in range(3)]),
-                ("correct", r["correct"],
-                 [judge_correctness(r["question"], r["golden_answer"], r["answer"]).passed
-                  for _ in range(3)]),
+                (
+                    "grounded",
+                    r["grounded"],
+                    [
+                        judge_groundedness(r["question"], r["context"], r["answer"]).passed
+                        for _ in range(3)
+                    ],
+                ),
+                (
+                    "correct",
+                    r["correct"],
+                    [
+                        judge_correctness(r["question"], r["golden_answer"], r["answer"]).passed
+                        for _ in range(3)
+                    ],
+                ),
             ]
         for name, logged, fresh in axes:
             checks += 1
@@ -164,7 +183,9 @@ def calibrate(run_json: Path) -> None:
                 flips += 1
                 print(f"FLIP {r['id']}/{name}: logged={logged}, fresh={fresh}")
     print(f"calibration: {flips} flipping axes out of {checks} (logged + 3 fresh each)")
-    print("D17 rule: 0 flips -> single-run judging; otherwise majority-of-3 becomes standing protocol")
+    print(
+        "D17 rule: 0 flips -> single-run judging; otherwise majority-of-3 becomes standing protocol"
+    )
 
 
 def compare(path_a: Path, path_b: Path) -> None:
@@ -185,15 +206,19 @@ def compare(path_a: Path, path_b: Path) -> None:
         same = ra["retrieved_pages"] == rb["retrieved_pages"]
         if same:
             identical.append(ra["id"])
-        print(f"| {ra['id']} | {int(ra['hit'])} | {int(rb['hit'])} "
-              f"| {ra['rr']:.2f} | {rb['rr']:.2f} | {'yes' if same else ''} |")
+        print(
+            f"| {ra['id']} | {int(ra['hit'])} | {int(rb['hit'])} "
+            f"| {ra['rr']:.2f} | {rb['rr']:.2f} | {'yes' if same else ''} |"
+        )
     for run in (a, b):
         scored = [r for r in run["rows"] if not r["trap"]]
         n = len(scored)
-        print(f"{run['config_label']}: hit {sum(r['hit'] for r in scored)}/{n}, "
-              f"MRR {sum(r['rr'] for r in scored) / n:.2f}, "
-              f"grounded {sum(r['grounded'] for r in scored)}/{n}, "
-              f"correct {sum(r['correct'] for r in scored)}/{n}")
+        print(
+            f"{run['config_label']}: hit {sum(r['hit'] for r in scored)}/{n}, "
+            f"MRR {sum(r['rr'] for r in scored) / n:.2f}, "
+            f"grounded {sum(r['grounded'] for r in scored)}/{n}, "
+            f"correct {sum(r['correct'] for r in scored)}/{n}"
+        )
     print(
         f"attributable readout: hit/MRR. grounded/correct deltas are confounded with "
         f"generation sampling and judge noise. rows with identical top-5 ({identical}) "

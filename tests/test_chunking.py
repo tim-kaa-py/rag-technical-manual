@@ -40,6 +40,17 @@ def test_continuation_chunk_spanning_a_heading_keeps_running_section_first():
     assert nodes[-1].metadata["section"] == "5.4 Lubrication Oil; 5.5 Coolant"
 
 
+def test_heading_inside_chunk_updates_section_for_following_chunks():
+    # F6: ~700 tokens after 5.5 force a second chunk; its section must be 5.5
+    # alone, proving a mid-chunk heading updates the RUNNING section (D9/D21)
+    filler = "The coolant must be inspected for contamination at regular intervals. " * 60
+    pages = [_page("5.4 Lubrication Oil\nOil text.\n5.5 Coolant\n" + filler, "42")]
+    nodes = build_nodes(pages)
+    assert len(nodes) >= 2
+    assert nodes[0].metadata["section"] == "5.4 Lubrication Oil; 5.5 Coolant"
+    assert nodes[-1].metadata["section"] == "5.5 Coolant"
+
+
 def test_degenerate_chunks_from_imageonly_pages_are_dropped():
     # D22: pp. 50-51 extract as just their footer page number — such chunks
     # carry no content and only pollute the index and citations

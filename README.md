@@ -26,7 +26,8 @@ uv run python -m src.ingest                       # parse, chunk, embed, load pg
 uv run python -m src.retrieve "Which fuel standard does the generator require?"
 uv run python -m src.generate "Which fuel standard does the generator require?"
 uv run uvicorn api.main:app --reload              # M4
-uv run python -m eval.run                         # M2
+uv run python -m eval.run --embed small           # golden Q&A -> metrics report
+uv run python -m eval.run --compare A.json B.json # embedding A/B side-by-side
 ```
 
 ## Data
@@ -45,10 +46,10 @@ Summarised in `CLAUDE.md`; running decision log with alternatives in `docs/decis
 Engineering docs live under `docs/documentation/`, one per code area:
 
 - `docs/documentation/src.md` — the RAG pipeline (ingest → query), file by file. **Present.**
-- `docs/documentation/eval.md` — the evaluation harness: methodology, metrics, how to read the numbers. *Arrives with M2.*
+- `docs/documentation/eval.md` — the evaluation harness: methodology, metrics, how to read the numbers. **Present.**
 - `docs/documentation/api.md` — the FastAPI service: endpoint contract, request/response, errors. *Arrives with M4.*
 
 A pre-commit hook (`.githooks/pre-commit`) blocks a commit that changes `src/`, `eval/`, or `api/` without updating that area's doc. Enable it once per clone with `git config core.hooksPath .githooks`.
 
-- `docs/decisions.md` — running decision log (D1–D18) that the code references by ID.
+- `docs/decisions.md` — running decision log (D1–D23) that the code references by ID.
 - `docs/requirements.md` — engineering spec and milestones.

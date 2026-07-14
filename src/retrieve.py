@@ -8,9 +8,7 @@ from src.config import DEFAULT_EMBED, TOP_K
 from src.store import get_index
 
 
-def retrieve(
-    question: str, k: int = TOP_K, embed: str = DEFAULT_EMBED
-) -> list[NodeWithScore]:
+def retrieve(question: str, k: int = TOP_K, embed: str = DEFAULT_EMBED) -> list[NodeWithScore]:
     retriever = get_index(embed).as_retriever(similarity_top_k=k)
     return retriever.retrieve(question)
 
