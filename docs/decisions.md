@@ -167,3 +167,16 @@ Running log of design decisions. Each entry: what was decided, what was consider
 - *OCR pass at ingest* — would recover text without vision models, but adds a new dependency and an uncontrolled extraction path for exactly the content M5's captioning already covers better. Rejected.
 
 **Why:** the gap is a corpus fact, not a parser failure — escalation per D8 was tested and gains nothing. Letting the eval confirm the predicted miss first turns a limitation into a measured before/after for the multimodal milestone.
+
+## D20 — Embedding text excludes `page` metadata, keeps `section` (2026-07-14)
+
+**Decision:** LlamaIndex embeds node metadata into the vector text by default — an inherited behavior never consciously chosen. From M2 on, `page` is excluded from the embedded text (`excluded_embed_metadata_keys`); `section` stays in. Decided **before** the first eval baseline so no measurement is invalidated.
+
+**Considered:**
+- *Exclude `page`, keep `section`* — chosen: page numbers are pure noise tokens in the vector; section labels ("5.6 Fuel") add genuine topical signal to continuation chunks that inherited a heading they don't contain.
+- *Keep both (framework default)* — zero-touch and already smoke-tested, but leaves an unexamined default silently shaping every similarity score. Rejected.
+- *Exclude both* — purest "the vector represents the text", but discards the one metadata field with real semantic content, hurting exactly the heading-less continuation chunks. Rejected.
+
+**Why:** the choice had to be made consciously and before results exist (changing it later re-baselines everything); section-in/page-out is the only option where every embedded token plausibly helps retrieval.
+
+**Note for M3:** the BM25 index must tokenize the same content the dense side embeds (D12 byte-identical invariant) — carry this exclusion over.
