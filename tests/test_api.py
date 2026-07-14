@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import anthropic
+import openai
 import pytest
 from fastapi.testclient import TestClient
 from llama_index.core.schema import NodeWithScore, TextNode
@@ -110,5 +111,16 @@ def test_generation_incomplete_maps_to_502(monkeypatch, client):
         raise GenerationIncompleteError("generation incomplete: stop_reason='max_tokens'")
 
     monkeypatch.setattr(api_mod, "answer_from_chunks", _truncated)
+    r = client.post("/query", json={"question": "Which fuel standard?"})
+    assert r.status_code == 502
+
+
+def test_embed_failure_maps_to_502(monkeypatch, client):
+    # the OpenAI embed edge is the third member of the 502 tuple — one test
+    # per promise: deleting openai.OpenAIError from the tuple must go red
+    def _embed_down(q):
+        raise openai.OpenAIError("connection error")
+
+    monkeypatch.setattr(api_mod, "hybrid_candidates", _embed_down)
     r = client.post("/query", json={"question": "Which fuel standard?"})
     assert r.status_code == 502

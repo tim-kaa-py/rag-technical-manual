@@ -211,3 +211,14 @@ Running log of design decisions. Each entry: what was decided, what was consider
 - *Interpret after M3 runs* — flexible, but post-hoc reading of a near-saturated instrument invites motivated reasoning in either direction. Rejected.
 
 **Why:** D17's freeze discipline applies to expectations too: the honest statement of where improvement *can* appear must predate the measurement that shows it.
+
+## D24 — Serving config: the API serves hybrid + rerank, surfaces degradation, 502s on generation failure (2026-07-14)
+
+**Decision:** `POST /query` serves the M3 rerank path (`hybrid_candidates → rerank → answer_from_chunks`), calling `rerank()` directly so D14's fallback surfaces in the response as `rerank_degraded` — explicitly an extension of F6's `{answer, sources}` shape. Upstream model failures and D15 under-delivery (`GenerationIncompleteError`) map to 502 with a generic body (N4); everything else stays a 500.
+
+**Considered:**
+- *Serve hybrid + rerank* — chosen: the only measured net-positive config (hit@5 10/11, MRR 0.91); M3 showed hybrid-without-rerank is strictly worse than dense (9/11, 0.69).
+- *Serve plain dense* — simpler, one fewer paid call per query, but leaves the measured +0.12 MRR on the table. Rejected.
+- *Strict F6 shape (hide the fallback flag)* — smaller response, exactly the spec; but D14's fallback exists to keep queries alive, not to be invisible — hiding it makes the API lie about its own ranking quality. Rejected.
+
+**Why:** serve what was measured best, and never report a degraded response as a full-quality one. Generation gets no graceful degradation by design (D15: no answer beats a wrong answer), so its failures are errors — 502 for "an upstream model didn't deliver", 500 for "our code broke".

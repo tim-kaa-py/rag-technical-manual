@@ -64,7 +64,7 @@ def query(request: QueryRequest) -> QueryResponse:
     # D15 under-delivery guard (rerank's edge already degrades internally,
     # D14). Anything else — e.g. Postgres down — is OUR failure: a 500.
     except (anthropic.AnthropicError, openai.OpenAIError, GenerationIncompleteError) as e:
-        logger.error("pipeline failure: %s", e)  # details to logs, not clients (N4)
+        logger.exception("pipeline failure")  # details + traceback to logs, not clients (N4)
         raise HTTPException(status_code=502, detail="upstream model failure") from e
     return QueryResponse(
         answer=rag.answer,
