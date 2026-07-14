@@ -83,6 +83,32 @@ fallback. Prompts are versioned (`JUDGE_PROMPT_VERSION`) and recorded in every
 run log. Unit tests cover parsing and the withholding guarantees; no test
 makes a paid API call.
 
+## Running it (`eval/run.py`)
+
+```bash
+uv run python -m eval.run --embed small   # or large
+```
+
+Per question: **retrieve once → log the exact context → generate from it →
+judge the logged context** (D17 "as-logged" — re-retrieving between generation
+and judging would judge a different run than the one that answered). The
+context handed to the groundedness judge is byte-identical to what the
+generator saw (`format_context` is shared).
+
+Output goes to `eval/results/`:
+
+- `<date>-<config_label>.json` — the full run log incl. as-logged contexts.
+  Written **before** any report formatting (the ~30 paid API calls in it must
+  survive a formatting crash); a same-day rerun is refused rather than
+  overwriting it. **Gitignored** — it contains full manual text.
+- `<date>-<config_label>.md` — the committed report: instrument-disclosure
+  header (models, prompt version, n-sensitivity, predicted-fail ceiling),
+  per-question table, judge justifications for failing rows, the trap row,
+  and count-based aggregates.
+
+`config_label` (e.g. `dense-small`) is the run's identity — M3 adds fused and
+reranked configs on the same embedding tier, and filenames must not collide.
+
 ## Files
 
 - `eval/golden.py` — `GoldenQuestion` (frozen dataclass) + `load_golden()`,
