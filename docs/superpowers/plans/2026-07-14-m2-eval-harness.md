@@ -193,14 +193,20 @@ Failing test in `tests/test_chunking.py`:
 from llama_index.core.schema import MetadataMode
 
 
-def test_page_metadata_is_excluded_from_embedding_text():
-    # D20: page numbers are noise tokens in the vector; section labels carry
-    # real topical signal for continuation chunks and stay in.
-    pages = [_page("5.4 Lubrication Oil\nUse API CF4 grade oil.", "42")]
+def test_embed_text_excludes_page_and_carries_section_into_continuation_chunks():
+    # D20's point is the CONTINUATION chunk: it inherited a heading its body
+    # does not contain, so the section metadata is the only topical signal —
+    # it must appear in the embedded text, while the page number must not.
+    pages = [
+        _page("5.4 Lubrication Oil\nUse API CF4 grade oil.", "42"),
+        _page("More lubrication details continue without any heading.", "43"),
+    ]
     nodes = build_nodes(pages)
-    embed_text = nodes[0].get_content(metadata_mode=MetadataMode.EMBED)
-    assert "page" not in embed_text
-    assert "5.4 Lubrication Oil" in embed_text  # section still embedded
+    continuation = nodes[-1]
+    assert "5.4 Lubrication Oil" not in continuation.text  # truly a continuation
+    embed_text = continuation.get_content(metadata_mode=MetadataMode.EMBED)
+    assert "5.4 Lubrication Oil" in embed_text  # section embedded (D20)
+    assert "page" not in embed_text  # page excluded (D20)
 ```
 
 Implementation — in `build_nodes` loop, after setting the section:
@@ -367,7 +373,14 @@ for term in ['torque', 'cylinder head', 'part number', 'spare part', 'sae']:
 
 Pick a trap topic with zero (or clearly non-answering) matches — the M1 smoke test proved "tire pressure" is NOT a clean trap (p. 9 mentions it). Also verify for q9 that no SAE-grade-vs-temperature mapping exists in the text (the chart on p. 42 is an image).
 
-- [ ] **Step 3: Write `eval/golden.json` — 10 questions**
+Additional verification (review findings):
+- **The grep cannot see images.** Visually read PDF pages 42, 48, 50, 51 (Read tool renders PDF pages) and confirm the trap topic is absent there too — a trap answered by an image would break retroactively when M5 captions those pages.
+- Check whether pp. 50–51 yield any chunks at all post-cleaning (`python -c "from src.parse import load_pages; [print(p.metadata['page'], len(p.text)) for p in load_pages() if p.metadata['page'] in ('50','51')]"`) — informs q8's hit expectations, and note for the M5 plan: caption nodes must carry pages 42/50/51 or q8/q9's expected-page sets die.
+- Find a real **part code / identifier on pp. 34–37** for q10 and a **numeric limit on a page outside pp. 42–43** for q11 (page-concentration fix: 5 of the original 9 scored rows expected pp. 42–43).
+
+- [ ] **Step 3: Write `eval/golden.json` — 12 questions (11 scored + 1 trap)**
+
+Two identifier-heavy questions (q10, q11) exist so M3's hybrid retrieval has measurable headroom — D12's whole case is part codes and numeric limits, and without them the frozen exam could show a working M3 as a zero delta.
 
 Draft (page sets and golden answers to be corrected against the Step-2 dumps; golden answers hand-written from the manual text / visually-read PDF pages, then approved):
 
@@ -382,19 +395,21 @@ Draft (page sets and golden answers to be corrected against the Step-2 dumps; go
   {"id": "q7", "qtype": "predicted-fail", "question": "At what interval should the V-belt tension be checked?", "expected_pages": ["48"], "golden_answer": "(hand-write from visually reading PDF p. 48 icon matrix)", "annotation": "predicted fail — D9: p. 48 icon-matrix associations lost in extraction", "trap": false},
   {"id": "q8", "qtype": "predicted-fail", "question": "The engine cranks slowly and will not start. What are the possible causes?", "expected_pages": ["49", "50", "51"], "golden_answer": "(hand-write from visually reading PDF pp. 50-51 troubleshooting table)", "annotation": "predicted fail — D19: troubleshooting table is image-only", "trap": false},
   {"id": "q9", "qtype": "predicted-fail", "question": "Which SAE oil grade should be used at an ambient temperature of -30°C?", "expected_pages": ["42"], "golden_answer": "(hand-write from visually reading the p. 42 chart)", "annotation": "predicted fail — D6: answer exists only in the SAE chart image; M5 target", "trap": false},
-  {"id": "q10", "qtype": "trap", "question": "(trap topic chosen in Step 2 — e.g. cylinder-head bolt torque)", "expected_pages": [], "golden_answer": "", "annotation": "trap — verified absent from corpus; expected behavior: explicit refusal (D15)", "trap": true}
+  {"id": "q10", "qtype": "identifier", "question": "(exact part-code/identifier lookup from pp. 34-37, finalized in Step 2 — the D12 sparse-wins case)", "expected_pages": ["34"], "golden_answer": "(hand-write from the verified page)", "annotation": "identifier lookup — M3 hybrid headroom", "trap": false},
+  {"id": "q11", "qtype": "lexical-numeric", "question": "(numeric-limit lookup from a page outside pp. 42-43, finalized in Step 2 — e.g. installation/noise/electrical limits pp. 25-32)", "expected_pages": ["(verify)"], "golden_answer": "(hand-write from the verified page)", "annotation": "numeric lookup — M3 hybrid headroom + page-spread", "trap": false},
+  {"id": "q12", "qtype": "trap", "question": "(trap topic chosen in Step 2 — e.g. cylinder-head bolt torque)", "expected_pages": [], "golden_answer": "", "annotation": "trap — verified absent from corpus text AND images; expected behavior: explicit refusal (D15)", "trap": true}
 ]
 ```
 
 - [ ] **Step 4: HUMAN CHECKPOINT (do not skip): present the full golden set for review**
 
-Show all 10 questions + expected pages + golden answers + the corpus evidence to the user. The user edits/approves. **The set is frozen at this commit (D17)** — any later change goes through the decision log.
+Show all 12 questions + expected pages + golden answers + the corpus evidence to the user. The user edits/approves. Before committing, **verify no "(finalize…)"/"(verify)" placeholder survives** — the loader does not catch them. **The set is frozen at this commit (D17)** — any later change goes through the decision log.
 
 - [ ] **Step 5: Commit the freeze**
 
 ```bash
 git add eval/__init__.py eval/golden.py eval/golden.json tests/test_golden.py
-git commit -m "M2: golden Q&A set frozen (10 questions incl. 3 predicted-fail + 1 trap, D17)" && git push
+git commit -m "M2: golden Q&A set frozen (12 questions incl. 3 predicted-fail + 1 trap, D17)" && git push
 ```
 
 ---
@@ -407,17 +422,17 @@ git commit -m "M2: golden Q&A set frozen (10 questions incl. 3 predicted-fail + 
 
 **Interfaces:**
 - Consumes: nothing (pure functions).
-- Produces: `hit_at_k(retrieved_pages: list[str], expected: set[str]) -> bool`; `reciprocal_rank(retrieved_pages: list[str], expected: set[str]) -> float`; `pages_found(retrieved_pages: list[str], expected: set[str]) -> str` (e.g. `"1/2"`). Task 5 consumes.
+- Produces: `hit(retrieved_pages: list[str], expected: set[str]) -> bool`; `reciprocal_rank(retrieved_pages: list[str], expected: set[str]) -> float`; `pages_found(retrieved_pages: list[str], expected: set[str]) -> str` (e.g. `"1/2"`). Task 5 consumes.
 
 - [ ] **Step 1: Failing tests**
 
 ```python
-from eval.metrics import hit_at_k, pages_found, reciprocal_rank
+from eval.metrics import hit, pages_found, reciprocal_rank
 
 
 def test_hit_when_any_retrieved_chunk_page_is_expected():
-    assert hit_at_k(["10", "43", "12", "43", "9"], {"43"}) is True
-    assert hit_at_k(["10", "11", "12", "13", "14"], {"43"}) is False
+    assert hit(["10", "43", "12", "43", "9"], {"43"}) is True
+    assert hit(["10", "11", "12", "13", "14"], {"43"}) is False
 
 
 def test_reciprocal_rank_uses_first_matching_chunk_position():
@@ -445,7 +460,7 @@ percentages with decimals.
 """
 
 
-def hit_at_k(retrieved_pages: list[str], expected: set[str]) -> bool:
+def hit(retrieved_pages: list[str], expected: set[str]) -> bool:
     return bool(set(retrieved_pages) & expected)
 
 
@@ -486,38 +501,38 @@ import pytest
 
 from eval.judge import (
     JudgeParseError,
-    _groundedness_prompt,
-    _parse_verdict,
-    _correctness_prompt,
+    groundedness_prompt,
+    parse_verdict,
+    correctness_prompt,
 )
 
 
-def test_parse_verdict_accepts_strict_json():
-    v = _parse_verdict('{"justification": "All claims cited from context.", "verdict": "pass"}')
+def testparse_verdict_accepts_strict_json():
+    v = parse_verdict('{"justification": "All claims cited from context.", "verdict": "pass"}')
     assert v.passed is True and "claims" in v.justification
 
 
-def test_parse_verdict_strips_code_fences():
+def testparse_verdict_strips_code_fences():
     raw = '```json\n{"justification": "Claim X unsupported.", "verdict": "fail"}\n```'
-    assert _parse_verdict(raw).passed is False
+    assert parse_verdict(raw).passed is False
 
 
-def test_parse_verdict_raises_on_garbage_or_bad_verdict():
+def testparse_verdict_raises_on_garbage_or_bad_verdict():
     with pytest.raises(JudgeParseError):
-        _parse_verdict("The answer looks fine to me.")
+        parse_verdict("The answer looks fine to me.")
     with pytest.raises(JudgeParseError):
-        _parse_verdict('{"justification": "x", "verdict": "maybe"}')
+        parse_verdict('{"justification": "x", "verdict": "maybe"}')
 
 
-def test_groundedness_prompt_withholds_golden_and_demands_justification_first():
-    p = _groundedness_prompt("Q?", "CONTEXT", "ANSWER")
+def testgroundedness_prompt_withholds_golden_and_demands_justification_first():
+    p = groundedness_prompt("Q?", "CONTEXT", "ANSWER")
     assert "CONTEXT" in p and "ANSWER" in p
     assert "golden" not in p.lower()  # reference-free axis (D17)
     assert p.index("justification") < p.index("verdict")  # autoregressive order
 
 
-def test_correctness_prompt_withholds_context():
-    p = _correctness_prompt("Q?", "GOLDEN", "ANSWER")
+def testcorrectness_prompt_withholds_context():
+    p = correctness_prompt("Q?", "GOLDEN", "ANSWER")
     assert "GOLDEN" in p and "ANSWER" in p
     assert "context" not in p.lower()  # reference-based axis judges against golden only
 ```
@@ -565,12 +580,14 @@ _JSON_SPEC = (
 )
 
 
-def _groundedness_prompt(question: str, context: str, answer: str) -> str:
+def groundedness_prompt(question: str, context: str, answer: str) -> str:
     return (
         "You are grading a RAG system's answer for GROUNDEDNESS only: is every "
         "claim in the answer supported by the provided excerpts?\n"
         "Rules:\n"
         "- Fail if ANY claim in the answer is not supported by the excerpts.\n"
+        "- Hedged claims ('typically', 'generally', 'usually') count as claims — "
+        "hedging does not exempt a statement from needing support.\n"
         "- An explicit refusal ('the manual does not contain...') is grounded (pass) "
         "if the excerpts indeed lack the information.\n"
         "- Do NOT judge whether the answer is correct or useful — only support.\n\n"
@@ -579,7 +596,7 @@ def _groundedness_prompt(question: str, context: str, answer: str) -> str:
     )
 
 
-def _correctness_prompt(question: str, golden_answer: str, answer: str) -> str:
+def correctness_prompt(question: str, golden_answer: str, answer: str) -> str:
     return (
         "You are grading a RAG system's answer for CORRECTNESS only: does it "
         "agree with the reference answer on the facts the question asks for?\n"
@@ -592,16 +609,19 @@ def _correctness_prompt(question: str, golden_answer: str, answer: str) -> str:
     )
 
 
-def _refusal_prompt(answer: str) -> str:
+def refusal_prompt(answer: str) -> str:
     return (
         "Does this answer explicitly decline to answer because the manual/context "
         "does not contain the information (as opposed to attempting an answer)?\n"
-        "verdict pass = it explicitly declines; fail = it attempts an answer.\n\n"
+        "verdict pass = it explicitly declines; fail = it attempts an answer.\n"
+        "IMPORTANT: if it declines but still supplies substantive information "
+        "answering the question (e.g. 'the manual does not say, but typically X'), "
+        "verdict fail — that is an attempt in disguise.\n\n"
         f"Answer:\n{answer}\n\n" + _JSON_SPEC
     )
 
 
-def _parse_verdict(raw: str) -> Verdict:
+def parse_verdict(raw: str) -> Verdict:
     text = raw.strip()
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
     try:
@@ -624,22 +644,22 @@ def _call(prompt: str) -> Verdict:
         )
         raw = next((b.text for b in response.content if b.type == "text"), "")
         try:
-            return _parse_verdict(raw)
+            return parse_verdict(raw)
         except JudgeParseError as e:
             last_error = e
     raise last_error
 
 
 def judge_groundedness(question: str, context: str, answer: str) -> Verdict:
-    return _call(_groundedness_prompt(question, context, answer))
+    return _call(groundedness_prompt(question, context, answer))
 
 
 def judge_correctness(question: str, golden_answer: str, answer: str) -> Verdict:
-    return _call(_correctness_prompt(question, golden_answer, answer))
+    return _call(correctness_prompt(question, golden_answer, answer))
 
 
 def judge_refusal(answer: str) -> Verdict:
-    return _call(_refusal_prompt(answer))
+    return _call(refusal_prompt(answer))
 ```
 
 - [ ] **Step 3: Run tests** → 5 passed. **Commit:**
@@ -656,10 +676,11 @@ git commit -m "M2: two-axis Opus judge, justification-first strict JSON, retry-o
 **Files:**
 - Create: `eval/run.py`, `eval/results/` (directory)
 - Modify: `.gitignore` (add `eval/results/*.json`)
+- Test: `tests/test_run.py`
 
 **Interfaces:**
 - Consumes: `load_golden`, metrics, judge functions, `retrieve`, `answer_from_chunks`, `format_context`.
-- Produces: `python -m eval.run [--embed small|large]` → writes `eval/results/<YYYY-MM-DD>-<embed>.json` (full as-logged contexts; **gitignored**) + `eval/results/<YYYY-MM-DD>-<embed>.md` (report; committed). Also `run_eval(embed) -> dict` and `write_report(run: dict) -> Path` for Tasks 7/8.
+- Produces: `python -m eval.run [--embed small|large]` → writes `eval/results/<YYYY-MM-DD>-<config_label>.json` (full as-logged contexts; **gitignored**) + `.md` report (committed). Also `run_eval(embed) -> dict` (with `config_label = "dense-{embed}"`) and `write_report(run: dict, out_dir: Path = RESULTS_DIR) -> Path` for Tasks 7/8.
 
 - [ ] **Step 1: Write `eval/run.py`**
 
@@ -679,7 +700,7 @@ from pathlib import Path
 
 from eval.golden import load_golden
 from eval.judge import JUDGE_PROMPT_VERSION, judge_correctness, judge_groundedness, judge_refusal
-from eval.metrics import hit_at_k, pages_found, reciprocal_rank
+from eval.metrics import hit, pages_found, reciprocal_rank
 from src.config import DEFAULT_EMBED, EMBED_CONFIGS, GENERATION_MODEL, JUDGE_MODEL
 from src.generate import answer_from_chunks, format_context
 from src.retrieve import retrieve
@@ -708,7 +729,7 @@ def run_eval(embed: str = DEFAULT_EMBED) -> dict:
             grounded = judge_groundedness(q.question, context, rag.answer)
             correct = judge_correctness(q.question, q.golden_answer, rag.answer)
             row |= {
-                "hit": hit_at_k(pages, expected),
+                "hit": hit(pages, expected),
                 "rr": reciprocal_rank(pages, expected),
                 "pages_found": pages_found(pages, expected),
                 "grounded": grounded.passed, "grounded_justification": grounded.justification,
@@ -719,6 +740,9 @@ def run_eval(embed: str = DEFAULT_EMBED) -> dict:
     return {
         "date": datetime.date.today().isoformat(),
         "embed": embed,
+        # config_label is the run's identity: M3 adds fused/reranked configs on the
+        # same embed tier, and filenames/compare headers must not collide then
+        "config_label": f"dense-{embed}",
         "embed_model": EMBED_CONFIGS[embed]["model"],
         "generation_model": GENERATION_MODEL,
         "judge_model": JUDGE_MODEL,
@@ -727,23 +751,40 @@ def run_eval(embed: str = DEFAULT_EMBED) -> dict:
     }
 
 
-def write_report(run: dict) -> Path:
+def write_report(run: dict, out_dir: Path = RESULTS_DIR) -> Path:
+    out_dir.mkdir(exist_ok=True)
+    stem = f"{run['date']}-{run['config_label']}"
+    raw = out_dir / f"{stem}.json"
+    if raw.exists():
+        raise RuntimeError(
+            f"{raw} exists — a same-day rerun would overwrite the log that "
+            "--calibrate/--compare read; move or delete it consciously first"
+        )
+    # ~30 paid API calls live in this dict: persist it BEFORE any report
+    # formatting has a chance to crash
+    raw.write_text(json.dumps(run, indent=2))
+
     scored = [r for r in run["rows"] if not r["trap"]]
     trap_rows = [r for r in run["rows"] if r["trap"]]
     n = len(scored)
+    predicted_fail = sum(1 for r in scored if "predicted fail" in (r["annotation"] or ""))
     hits = sum(r["hit"] for r in scored)
     grounded = sum(r["grounded"] for r in scored)
     correct = sum(r["correct"] for r in scored)
     mrr = sum(r["rr"] for r in scored) / n
 
     lines = [
-        f"# Eval report — {run['date']} — embed: {run['embed']}",
+        f"# Eval report — {run['date']} — {run['config_label']}",
         "",
         f"- Embedding: `{run['embed_model']}` · Generation: `{run['generation_model']}`"
         f" · Judge: `{run['judge_model']}` (prompt {run['judge_prompt_version']})",
         "- Instrument notes: same-vendor limitation (Anthropic judge grading an Anthropic"
         f" generator); smallest observable delta at n={n} is one question"
-        f" (~{round(100 / n)} points); counts, not percentages (D17).",
+        f" (~{round(100 / n)} points); counts, not percentages (D17); the single trap"
+        " question is a hallucination probe of n=1; the golden set is not blind"
+        " (drafted knowing the M1 smoke results).",
+        f"- Predicted-fail ceiling: {predicted_fail} scored rows cannot pass correctness"
+        f" by design (D9/D19/D6) — best achievable correct = {n - predicted_fail}/{n}.",
         "",
         "| id | type | expected | retrieved (rank order) | hit | RR | pages | grounded | correct | annotation |",
         "|---|---|---|---|---|---|---|---|---|---|",
@@ -755,6 +796,13 @@ def write_report(run: dict) -> Path:
             f"| {r['rr']:.2f} | {r['pages_found']} | {'1' if r['grounded'] else '0'} "
             f"| {'1' if r['correct'] else '0'} | {r['annotation'] or ''} |"
         )
+    failing = [r for r in scored if not (r["grounded"] and r["correct"])]
+    if failing:
+        lines += ["", "### Judge justifications (failing rows)", ""]
+        for r in failing:
+            for axis in ("grounded", "correct"):
+                if not r[axis]:
+                    lines.append(f"- **{r['id']}/{axis}**: {r[axis + '_justification']}")
     for r in trap_rows:
         lines += [
             "",
@@ -770,10 +818,7 @@ def write_report(run: dict) -> Path:
         " ¬grounded∧correct → parametric-knowledge answer (D15's target).",
     ]
 
-    RESULTS_DIR.mkdir(exist_ok=True)
-    stem = f"{run['date']}-{run['embed']}"
-    (RESULTS_DIR / f"{stem}.json").write_text(json.dumps(run, indent=2))
-    report = RESULTS_DIR / f"{stem}.md"
+    report = out_dir / f"{stem}.md"
     report.write_text("\n".join(lines) + "\n")
     return report
 
@@ -792,43 +837,86 @@ if __name__ == "__main__":
 eval/results/*.json
 ```
 
-- [ ] **Step 3: Dry-run the wiring without paid calls** — temporarily run with a single non-trap question is not worth scaffolding; instead verify imports and CLI parse:
+- [ ] **Step 3 (TDD): stub test pinning the row schema shared by run_eval/write_report/calibrate/compare**
 
-```bash
-uv run python -c "import eval.run; print('imports OK')"
-uv run python -m eval.run --help
+The row dicts are an implicit schema matched by string keys across four functions, and the orchestrator is the only seam that costs money to debug. One stub test, no paid calls:
+
+```python
+from types import SimpleNamespace
+
+from llama_index.core.schema import NodeWithScore, TextNode
+
+import eval.run as run_mod
+from eval.golden import GoldenQuestion
+
+
+def _chunk(page: str) -> NodeWithScore:
+    node = TextNode(text=f"chunk text {page}", metadata={"page": page, "section": "5.6 Fuel"})
+    return NodeWithScore(node=node, score=0.9)
+
+
+def _verdict(passed: bool) -> SimpleNamespace:
+    return SimpleNamespace(passed=passed, justification="stub reasoning")
+
+
+def test_run_eval_and_write_report_agree_on_row_schema(monkeypatch, tmp_path):
+    golden = [
+        GoldenQuestion(id="q1", qtype="lexical", question="Which fuel?",
+                       expected_pages=["43"], golden_answer="EN590.",
+                       annotation=None, trap=False),
+        GoldenQuestion(id="q12", qtype="trap", question="Torque?",
+                       expected_pages=[], golden_answer="",
+                       annotation="trap", trap=True),
+    ]
+    monkeypatch.setattr(run_mod, "load_golden", lambda: golden)
+    monkeypatch.setattr(run_mod, "retrieve", lambda q, embed=None: [_chunk("43")])
+    monkeypatch.setattr(
+        run_mod, "answer_from_chunks",
+        lambda q, chunks: SimpleNamespace(answer="EN590 (p. 43).", sources=[]),
+    )
+    monkeypatch.setattr(run_mod, "judge_groundedness", lambda *a: _verdict(True))
+    monkeypatch.setattr(run_mod, "judge_correctness", lambda *a: _verdict(False))
+    monkeypatch.setattr(run_mod, "judge_refusal", lambda *a: _verdict(True))
+
+    run = run_mod.run_eval("small")
+    assert run["config_label"] == "dense-small"
+    report = run_mod.write_report(run, out_dir=tmp_path)
+
+    text = report.read_text()
+    assert "hit@5 = 1/1" in text and "MRR@5 = 1.00" in text
+    assert "q1/correct: stub reasoning".replace(":", "**:") in text or "q1/correct" in text
+    assert "refused = yes" in text
+    assert (tmp_path / f"{run['date']}-dense-small.json").exists()
 ```
+
+Run: `uv run pytest tests/test_run.py -v` → 1 passed. Also verify CLI parse: `uv run python -m eval.run --help`.
 
 - [ ] **Step 4: Commit:**
 
 ```bash
-git add eval/run.py .gitignore
+git add eval/run.py tests/test_run.py .gitignore
 git commit -m "M2: eval orchestrator — as-logged context judging, counts-based report (D17)" && git push
 ```
 
 ---
 
-### Task 6: Baseline run (small) — HUMAN CHECKPOINT on the numbers
+### Task 6: Baseline run (small) — NOT blessed yet
+
+Ordering matters (review finding): D17 says calibration determines the standing judge protocol, so the baseline is **not presented or committed** until Task 7 has calibrated the instrument. Otherwise a flips>0 outcome would invalidate an already-blessed report, and the A/B would compare two different instruments.
 
 - [ ] **Step 1:** `uv run python -m eval.run --embed small`
-  Expected: 10 question lines, report path printed. Cost: ~10 Sonnet generations + ~19 Opus judge calls (cents to ~$1).
-- [ ] **Step 2:** Read the report; sanity-check against known facts: q1 should hit p. 43 (rank 1 per M1 smoke); q7/q8/q9 annotations should show the predicted dissociations (hit may pass while correct fails); trap must show refused=yes.
-- [ ] **Step 3 (do not skip):** Present the full per-question table to the user with commentary: which predictions held, which quadrants appeared, anything surprising. This is the M1 baseline the M3 delta will be measured against.
-- [ ] **Step 4:** Commit the report:
-
-```bash
-git add eval/results/*.md
-git commit -m "M2: dense baseline eval run (small embedding) — measured, not asserted" && git push
-```
+  Expected: 12 question lines, report path printed. Cost: ~12 Sonnet generations + ~23 Opus judge calls (roughly $1).
+- [ ] **Step 2:** Sanity-check the report against known facts (no user presentation yet): q1 should hit p. 43 (rank 1 per M1 smoke); q7/q8/q9 should show the predicted dissociations (hit may pass while correct fails); trap must show refused=yes. If the harness itself misbehaves (crash, judge parse failure), fix and re-run (move the stale JSON aside first — write_report refuses to overwrite).
+- [ ] **Step 3:** Hand the run JSON to Task 7. No commit of results yet.
 
 ---
 
-### Task 7: Judge flip-rate calibration (one-time, D17)
+### Task 7: Judge flip-rate calibration, then bless the baseline (one-time, D17) — HUMAN CHECKPOINT
 
 **Files:**
 - Modify: `eval/run.py` (add `--calibrate <run-json>` mode)
 
-- [ ] **Step 1: Add calibration mode** — re-judges the *logged* answers/contexts 3×, no re-generation (isolates judge noise from generator noise):
+- [ ] **Step 1: Add calibration mode** — re-judges the *logged* answers/contexts 3×, no re-generation (isolates judge noise from generator noise). The originally logged verdict counts as a **fourth sample**: three fresh unanimous calls that disagree with the logged verdict are still a flip.
 
 ```python
 def calibrate(run_json: Path) -> None:
@@ -837,21 +925,23 @@ def calibrate(run_json: Path) -> None:
     checks = 0
     for r in run["rows"]:
         if r["trap"]:
-            verdicts = [judge_refusal(r["answer"]).passed for _ in range(3)]
-            axes = [("refused", verdicts)]
+            axes = [("refused", r["refused"],
+                     [judge_refusal(r["answer"]).passed for _ in range(3)])]
         else:
             axes = [
-                ("grounded", [judge_groundedness(r["question"], r["context"], r["answer"]).passed
-                              for _ in range(3)]),
-                ("correct", [judge_correctness(r["question"], r["golden_answer"], r["answer"]).passed
-                             for _ in range(3)]),
+                ("grounded", r["grounded"],
+                 [judge_groundedness(r["question"], r["context"], r["answer"]).passed
+                  for _ in range(3)]),
+                ("correct", r["correct"],
+                 [judge_correctness(r["question"], r["golden_answer"], r["answer"]).passed
+                  for _ in range(3)]),
             ]
-        for name, vs in axes:
+        for name, logged, fresh in axes:
             checks += 1
-            if len(set(vs)) > 1:
+            if len(set(fresh + [logged])) > 1:
                 flips += 1
-                print(f"FLIP {r['id']}/{name}: {vs}")
-    print(f"calibration: {flips} flipping axes out of {checks} (3 runs each)")
+                print(f"FLIP {r['id']}/{name}: logged={logged}, fresh={fresh}")
+    print(f"calibration: {flips} flipping axes out of {checks} (logged + 3 fresh each)")
     print("D17 rule: 0 flips -> single-run judging; otherwise majority-of-3 becomes standing protocol")
 ```
 
@@ -867,13 +957,17 @@ Wire into argparse:
         print(f"report: {path}")
 ```
 
-- [ ] **Step 2:** `uv run python -m eval.run --calibrate eval/results/<date>-small.json`
-  (~57 Opus calls, judge-only.) Record the flip count.
-- [ ] **Step 3:** Apply the D17 rule (0 flips → single-run; else majority-of-3 — if flips > 0, implement majority-of-3 in `run_eval` before Task 8 and note it in the report header). Add the calibration result line to the baseline report header, and log the outcome in `docs/decisions.md` only if the majority-of-3 protocol is triggered (it changes the instrument).
-- [ ] **Step 4:** Commit.
+- [ ] **Step 2:** `uv run python -m eval.run --calibrate eval/results/<date>-dense-small.json`
+  (~69 Opus calls, judge-only.) Record the flip count.
+- [ ] **Step 3: Apply the D17 rule.**
+  - **0 flips** → single-run judging is the standing protocol; add the calibration result line to the baseline report header; cite it whenever a judge number is quoted.
+  - **flips > 0** → majority-of-3 becomes the standing protocol: take the majority verdict per axis from the 3 fresh calibration samples (already paid for), patch them into the run dict, regenerate the baseline report via `write_report` (delete the stale md/json first), extend `run_eval` to judge 3×/majority for all future runs (Task 8 included), and log the instrument change in `docs/decisions.md`.
+- [ ] **Step 4 (do not skip): HUMAN CHECKPOINT — present baseline + calibration together.** The full per-question table with commentary: which predictions held, which quadrants appeared, the flip rate, anything surprising. This is the M1 baseline the M3 delta will be measured against.
+- [ ] **Step 5:** Commit the blessed baseline:
 
 ```bash
-git add -A && git commit -m "M2: judge flip-rate calibration (3x) — result recorded in report header" && git push
+git add eval/results/*.md eval/run.py
+git commit -m "M2: dense baseline (small) + judge flip-rate calibration — instrument blessed before use (D17)" && git push
 ```
 
 ---
@@ -884,28 +978,58 @@ git add -A && git commit -m "M2: judge flip-rate calibration (3x) — result rec
 - Modify: `eval/run.py` (add `--compare A.json B.json` mode)
 
 - [ ] **Step 1:** `uv run python -m src.ingest large` — builds `data_teksan_manual_large` (3072-dim). Verify: 82 rows, no ANN index, and the small table still has its 82 rows (`python -c "from src.store import verify_store; print(verify_store('small'), verify_store('large'))"`).
+
+Then verify **chunk identity**, not just counts — "same 82 chunks" is an A/B precondition, verified, not assumed:
+
+```bash
+uv run python -c "
+import hashlib
+import psycopg2
+from src.config import pg_params
+from src.store import full_table
+conn = psycopg2.connect(**pg_params())
+for embed in ('small', 'large'):
+    with conn.cursor() as cur:
+        cur.execute(f'SELECT text FROM \"{full_table(embed)}\" ORDER BY text')
+        digest = hashlib.sha256('\n'.join(r[0] for r in cur.fetchall()).encode()).hexdigest()[:12]
+        print(embed, digest)
+conn.close()
+"
+```
+
+Expected: identical digests for both tiers.
 - [ ] **Step 2:** `uv run python -m eval.run --embed large` → second report.
 - [ ] **Step 3: Add `--compare` mode** producing a side-by-side table:
 
 ```python
 def compare(path_a: Path, path_b: Path) -> None:
     a, b = json.loads(path_a.read_text()), json.loads(path_b.read_text())
-    print(f"| id | hit {a['embed']} | hit {b['embed']} | RR {a['embed']} | RR {b['embed']} |")
-    print("|---|---|---|---|---|")
+    la, lb = a["config_label"], b["config_label"]
+    print(f"| id | hit {la} | hit {lb} | RR {la} | RR {lb} | same top-5? |")
+    print("|---|---|---|---|---|---|")
     rows_b = {r["id"]: r for r in b["rows"]}
+    identical = []
     for ra in a["rows"]:
         if ra["trap"]:
             continue
         rb = rows_b[ra["id"]]
+        same = ra["retrieved_pages"] == rb["retrieved_pages"]
+        if same:
+            identical.append(ra["id"])
         print(f"| {ra['id']} | {int(ra['hit'])} | {int(rb['hit'])} "
-              f"| {ra['rr']:.2f} | {rb['rr']:.2f} |")
+              f"| {ra['rr']:.2f} | {rb['rr']:.2f} | {'yes' if same else ''} |")
     for run in (a, b):
         scored = [r for r in run["rows"] if not r["trap"]]
         n = len(scored)
-        print(f"{run['embed']}: hit {sum(r['hit'] for r in scored)}/{n}, "
+        print(f"{run['config_label']}: hit {sum(r['hit'] for r in scored)}/{n}, "
               f"MRR {sum(r['rr'] for r in scored) / n:.2f}, "
               f"grounded {sum(r['grounded'] for r in scored)}/{n}, "
               f"correct {sum(r['correct'] for r in scored)}/{n}")
+    print(
+        f"attributable readout: hit/MRR. grounded/correct deltas are confounded with "
+        f"generation sampling and judge noise. rows with identical top-5 ({identical}) "
+        f"— any judge disagreement there is a free noise estimate."
+    )
 ```
 
 Final `__main__` dispatch after this task:
@@ -927,7 +1051,7 @@ if __name__ == "__main__":
         print(f"report: {path}")
 ```
 
-- [ ] **Step 4:** Run the comparison, append its table to the large report under `## A/B small vs large`. **Pre-committed honest reading (D17):** "no measurable difference — small suffices" is a finding, not a failed experiment; any delta smaller than one question is invisible at this n.
+- [ ] **Step 4:** Run the comparison, append its table to the large report under `## A/B small vs large`. **Pre-committed honest reading (D17):** "no measurable difference — small suffices" is a finding, not a failed experiment; any delta smaller than one question is invisible at this n. The A/B verdict rests on **hit/MRR only** — regenerating per config is methodologically required (the context differs), but it means grounded/correct deltas carry generation and judge noise and must not be attributed to the embedding tier.
 - [ ] **Step 5:** Present the A/B result to the user, then commit:
 
 ```bash
