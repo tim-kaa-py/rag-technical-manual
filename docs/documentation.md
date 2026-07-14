@@ -7,39 +7,7 @@ It reflects the **M1** state: the straight-line path from a PDF to a grounded,
 sourced answer. Decision IDs (`D9`, `D11`, …) reference [decisions.md](decisions.md);
 that log is the source of truth for the *why* behind each choice.
 
-## Run it
-
-From a clean checkout to a grounded answer:
-
-```bash
-# 1. Install dependencies
-uv sync
-
-# 2. Secrets — fill in ANTHROPIC_API_KEY + OPENAI_API_KEY
-cp .env.example .env
-
-# 3. Start Postgres + pgvector (needs Docker)
-docker run -d --name rag-pg -p 5433:5432 \
-  -e POSTGRES_USER=rag -e POSTGRES_PASSWORD=rag -e POSTGRES_DB=rag \
-  pgvector/pgvector:pg17
-
-# 4. Verify the environment (Postgres reachable, keys set, corpus present)
-uv run python -m src.config
-
-# 5. Ingest: parse → clean → chunk → embed → load pgvector
-uv run python -m src.ingest
-
-# 6. Ask a question
-uv run python -m src.generate "Which fuel standard does the generator require?"
-```
-
-**Expected output.** Step 5 prints the chunk count, `loaded N rows into pgvector`,
-and `D11 verified: no ANN index — exact scan`. Step 6 prints a grounded answer
-with inline page citations, followed by a `Sources:` list of page/section
-references — or the exact refusal string if the manual doesn't cover the question.
-
-> Prerequisites: Python 3.12, [uv](https://docs.astral.sh/uv/), Docker, and the
-> corpus file `data/teksan_generator.pdf` (gitignored — see [README](../README.md#data)).
+To set up and run the pipeline, see the Quickstart in the [README](../README.md#quickstart).
 
 The pipeline has two phases:
 

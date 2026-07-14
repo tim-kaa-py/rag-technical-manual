@@ -36,3 +36,9 @@ The corpus is **not** committed (copyrighted manuals / local assets, gitignored)
 ## Stack rationale
 
 Summarised in `CLAUDE.md`; running decision log with alternatives in `docs/decisions.md` (spec-time decisions in `docs/requirements.md` §4).
+
+## Documentation
+
+- `docs/documentation.md` — engineering documentation: what every file does and why, following the ingest → query pipeline.
+- `docs/decisions.md` — running decision log (D1–D18) that the code references by ID.
+- `docs/requirements.md` — engineering spec and milestones.
