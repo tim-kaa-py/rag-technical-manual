@@ -24,7 +24,8 @@ EMBED_DIM = 1536
 # D16 — per-role model tiers; only generation is used in M1
 GENERATION_MODEL = "claude-sonnet-5"
 
-PDF_PATH = Path("data/teksan_generator.pdf")
+_ROOT = Path(__file__).resolve().parent.parent  # repo root, independent of cwd
+PDF_PATH = _ROOT / "data" / "teksan_generator.pdf"
 TABLE_NAME = "teksan_manual"  # LlamaIndex will create it as data_teksan_manual
 
 
