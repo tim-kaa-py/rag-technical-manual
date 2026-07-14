@@ -7,7 +7,9 @@ from src.rerank import RerankParseError, parse_ranking, rerank, rerank_prompt
 
 
 def _chunk(node_id: str, page: str) -> NodeWithScore:
-    node = TextNode(id_=node_id, text=f"chunk {node_id}", metadata={"page": page, "section": "5.6 Fuel"})
+    node = TextNode(
+        id_=node_id, text=f"chunk {node_id}", metadata={"page": page, "section": "5.6 Fuel"}
+    )
     return NodeWithScore(node=node, score=0.02)
 
 

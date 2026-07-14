@@ -89,7 +89,10 @@ def rerank_retrieve(question: str, embed: str = DEFAULT_EMBED) -> list[NodeWithS
 if __name__ == "__main__":
     import sys
 
-    question = " ".join(sys.argv[1:]) or "How does high fuel sulphur content affect the oil change interval?"
+    question = (
+        " ".join(sys.argv[1:])
+        or "How does high fuel sulphur content affect the oil change interval?"
+    )
     for r in rerank_retrieve(question):
         print(
             f"p.{r.node.metadata['page']:>3}  [{r.node.metadata.get('section', '?')[:40]}]  "

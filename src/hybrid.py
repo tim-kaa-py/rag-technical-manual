@@ -52,7 +52,10 @@ def arm_results(question: str, embed: str = DEFAULT_EMBED) -> dict[str, list[Nod
 
 
 if __name__ == "__main__":
-    question = " ".join(sys.argv[1:]) or "How does high fuel sulphur content affect the oil change interval?"
+    question = (
+        " ".join(sys.argv[1:])
+        or "How does high fuel sulphur content affect the oil change interval?"
+    )
     results = hybrid_candidates(question)
     for r in results:
         print(

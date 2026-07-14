@@ -139,6 +139,17 @@ resolution — "no measurable difference; small suffices" was pre-committed as a
 valid finding, and it is what the 2026-07-14 A/B measured (hit identical
 10/11; MRR +0.05 for large — sub-resolution).
 
+**M3 configs:** the same machinery compares retrieval modes on one embedding
+tier — `dense` vs `hybrid` vs `rerank` — with the added guarantees that the
+fused candidate lists are identity-checked across the compared runs (node_id
+level) and each rerank row carries its own within-run control
+(`candidates[:5]` is that run's hybrid top-5). Measured 2026-07-14: fusion
+alone *degraded* retrieval (hit 9/11, MRR 0.69 — sparse dilution on
+semantic-only questions); the listwise reranker restored and surpassed the
+baseline (hit 10/11, MRR 0.91 — the pre-committed D23 ceiling). Consequence
+for serving: hybrid-without-rerank is strictly worse than plain dense here —
+the rerank stage is what makes hybrid net-positive.
+
 ## Files
 
 - `eval/golden.py` — `GoldenQuestion` (frozen dataclass) + `load_golden()`,

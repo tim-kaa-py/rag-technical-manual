@@ -24,10 +24,12 @@ docker run -d --name rag-pg -p 5433:5432 \
 # 4. Run (modules built incrementally — see docs/requirements.md milestones)
 uv run python -m src.ingest                       # parse, chunk, embed, load pgvector
 uv run python -m src.retrieve "Which fuel standard does the generator require?"
+uv run python -m src.hybrid "your question"       # fused dense+BM25 candidates (M3)
+uv run python -m src.rerank "your question"       # reranked top-5, one Haiku call (M3)
 uv run python -m src.generate "Which fuel standard does the generator require?"
 uv run uvicorn api.main:app --reload              # M4
-uv run python -m eval.run --embed small           # golden Q&A -> metrics report
-uv run python -m eval.run --compare A.json B.json # embedding A/B side-by-side
+uv run python -m eval.run --mode rerank --embed small  # golden Q&A -> metrics report
+uv run python -m eval.run --compare A.json B.json       # config A/B side-by-side
 ```
 
 ## Data
