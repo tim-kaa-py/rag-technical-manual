@@ -4,6 +4,7 @@ from contextlib import contextmanager
 
 import psycopg2
 from llama_index.core import VectorStoreIndex
+from llama_index.core.schema import TextNode
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.vector_stores.postgres import PGVectorStore
 
@@ -66,3 +67,25 @@ def verify_store(embed: str = DEFAULT_EMBED) -> tuple[int, list[str]]:
         )
         ann = [r[0] for r in cur.fetchall()]
     return rows, ann
+
+
+def load_nodes(embed: str = DEFAULT_EMBED) -> list[TextNode]:
+    """Rebuild chunk nodes FROM Postgres (D12): dense and sparse must score
+    byte-identical chunk sets, so the sparse index is derived from the store
+    of record — never by re-chunking the PDF. RRF dedups by node.hash
+    (text + metadata), so the reconstruction must match ingest-time nodes
+    exactly; node ids are used to PAIR nodes for verification, not by fusion."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(f'SELECT node_id, text, metadata_ FROM "{full_table(embed)}" ORDER BY id')
+        rows = cur.fetchall()
+    nodes = []
+    for node_id, text, meta in rows:
+        node = TextNode(
+            id_=node_id,
+            text=text,
+            metadata={"page": meta["page"], "section": meta["section"]},
+        )
+        # D20: BM25Retriever tokenizes EMBED-mode content — mirror ingest exactly
+        node.excluded_embed_metadata_keys = ["page"]
+        nodes.append(node)
+    return nodes

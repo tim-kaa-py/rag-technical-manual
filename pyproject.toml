@@ -24,6 +24,7 @@ dependencies = [
     # Config
     "python-dotenv",
     "pydantic",
+    "llama-index-retrievers-bm25>=0.7.1",
 ]
 
 [dependency-groups]

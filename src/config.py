@@ -17,6 +17,9 @@ CHUNK_OVERLAP = 64
 # D13 — context budget: every measured config delivers exactly 5 chunks
 TOP_K = 5
 
+# D13 — fusion candidate depth: 10 per retriever in, TOP_K out
+CANDIDATE_K = 10
+
 # D3 — embedding tiers; the M2 harness A/Bs small vs large (D7/D17).
 # Each tier gets its own table so the configs are not mutually destructive
 # under D18's drop-and-rebuild. LlamaIndex prefixes tables with "data_".

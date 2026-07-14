@@ -97,6 +97,11 @@ try/finally). Two deliberate choices baked in:
   recall, so retrieval quality is never confounded by approximation.
   `verify_store()` actively checks no HNSW/IVFFlat index snuck in.
 - **`drop_table()`** supports drop-and-rebuild ingest (D18).
+- **`load_nodes()`** rebuilds the chunk nodes *from* Postgres (D12) — the
+  sparse BM25 index derives from the store of record, never from re-chunking
+  the PDF, so dense and sparse score byte-identical chunk sets. The
+  reconstruction mirrors ingest exactly (same metadata, same D20 exclusion);
+  a hermetic test pins hash + embed-content equality against `build_nodes`.
 
 ### `ingest.py` — the offline pipeline, orchestrated
 Ties phase one together: drop table → `load_pages` → `build_nodes` → embed +
@@ -108,8 +113,20 @@ raise `RuntimeError` (not `assert`, so `python -O` can't strip the guards).
 ### `retrieve.py` — question → top-5 chunks
 The query phase begins. Embeds the question and pulls the 5 nearest chunks by
 cosine similarity; takes an `embed` tier so the M2 A/B can query either table.
-Tiny by design — currently pure dense retrieval. This is where hybrid (keyword)
-search and reranking will slot in later (M3). (D11, D13)
+Tiny by design — pure dense retrieval, the M2 baseline config. (D11, D13)
+
+### `hybrid.py` — dense + BM25, fused by RRF (M3)
+The sparse arm is an in-memory `BM25Retriever` over the nodes from
+`load_nodes()` — it tokenizes EMBED-mode content, so sparse scores exactly
+the text dense embedded (D20 invariant). Both arms return 10 candidates
+(`CANDIDATE_K`); `QueryFusionRetriever` merges them by Reciprocal Rank
+Fusion (k=60, the literature constant — adopted, not tuned) with
+`num_queries=1` pinned (the library default of 4 silently expands queries
+via an LLM). Fusion dedups by `node.hash` (text + metadata) — which is why
+`load_nodes`' exact reconstruction matters. `hybrid_candidates()` returns
+the 10 fused candidates (the reranker's input); `arm_results()` exposes
+per-arm top-10s for eval instrumentation only. Retrievers are cached per
+embed tier for the process lifetime (D12: rebuild at startup). (D12, D13)
 
 ### `generate.py` — chunks → grounded, sourced answer
 The payoff. Hand-rolls the prompt (rather than using a LlamaIndex query engine)
