@@ -10,6 +10,9 @@ It mirrors the document-heavy field-service problem space (technical manuals, tr
 # 1. Install deps
 uv sync
 
+# (one-time) enable the repo's git hooks — keeps docs/documentation.md in sync
+git config core.hooksPath .githooks
+
 # 2. Secrets
 cp .env.example .env      # fill in ANTHROPIC_API_KEY (console.anthropic.com) + OPENAI_API_KEY
 
@@ -39,6 +42,6 @@ Summarised in `CLAUDE.md`; running decision log with alternatives in `docs/decis
 
 ## Documentation
 
-- `docs/documentation.md` — engineering documentation: what every file does and why, following the ingest → query pipeline.
+- `docs/documentation.md` — engineering documentation: what every file does and why, following the ingest → query pipeline. A pre-commit hook (`.githooks/pre-commit`) blocks commits that change `src/` without updating this doc; run `git config core.hooksPath .githooks` once per clone to enable it.
 - `docs/decisions.md` — running decision log (D1–D18) that the code references by ID.
 - `docs/requirements.md` — engineering spec and milestones.

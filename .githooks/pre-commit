@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Docs freshness detector (see docs/superpowers/specs/2026-07-14-doc-freshness-automation-design.md).
+# Blocks a commit that changes src/ Python without updating the engineering doc.
+# Deliberately dumb: it only knows "src changed, doc didn't" — not whether the
+# change needed doc work. Bypass a genuine false positive with: git commit --no-verify
+set -euo pipefail
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+src_changed=$(printf '%s\n' "$staged" | grep -E '^src/.*\.py$' || true)
+doc_staged=$(printf '%s\n' "$staged" | grep -Fx 'docs/documentation.md' || true)
+
+if [ -n "$src_changed" ] && [ -z "$doc_staged" ]; then
+  {
+    echo "✗ Docs freshness check: src/ changed but docs/documentation.md did not."
+    echo ""
+    echo "  Changed source files:"
+    printf '%s\n' "$src_changed" | sed 's/^/    /'
+    echo ""
+    echo "  Keep the engineering doc current:"
+    echo "    • In a Claude session: run /update-docs"
+    echo "    • Or edit docs/documentation.md yourself"
+    echo ""
+    echo "  If this change genuinely needs no doc update, bypass with:"
+    echo "    git commit --no-verify"
+  } >&2
+  exit 1
+fi
+exit 0
