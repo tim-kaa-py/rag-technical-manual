@@ -1,6 +1,6 @@
 # Code Documentation — M1 Core RAG Spine
 
-_Last updated: 2026-07-14 · reflects milestone M1_
+_Last updated: 2026-07-14 · reflects milestone M1 + the M2 embedding-A/B seam_
 
 This document maps every file in the codebase and explains what it does and why.
 It reflects the **M1** state: the straight-line path from a PDF to a grounded,
@@ -30,8 +30,12 @@ ID that fixed it (traceable to [decisions.md](../decisions.md)):
 
 - Chunk size / overlap: **512 / 64** (D9)
 - `TOP_K = 5` retrieved chunks (D13)
-- Embedding model + dimension: `text-embedding-3-small`, **1536** (D3)
-- Generation model: `claude-sonnet-5` (D16)
+- `EMBED_CONFIGS`: the two embedding tiers the M2 harness A/Bs (D3/D17) —
+  `"small"` (`text-embedding-3-small`, 1536-dim, table `teksan_manual`) and
+  `"large"` (`text-embedding-3-large`, 3072-dim, table `teksan_manual_large`).
+  Separate tables per tier so drop-and-rebuild ingest (D18) of one tier can't
+  destroy the other. `DEFAULT_EMBED = "small"`.
+- Generation model: `claude-sonnet-5`; judge model: `claude-opus-4-8` (D16)
 - PDF path and Postgres connection params
 
 `_check()` is the **M0 smoke test** (`python -m src.config`): confirms Postgres
@@ -70,9 +74,18 @@ seen at that chunk's *start*. A heading appearing mid-chunk updates the running
 section for *following* chunks. Text before any heading is tagged `"unknown"`.
 Output: `TextNode`s each carrying `{page, section}` plus text.
 
+**What gets embedded (D20):** the `section` label is prepended into the text
+that gets embedded (a continuation chunk inherits a heading its body doesn't
+contain — the label is its only topical signal), while the `page` number is
+excluded (`excluded_embed_metadata_keys`) — it's citation metadata, not meaning.
+
 ### `store.py` — pgvector access layer
 The database seam. Provides the OpenAI embedder, the `PGVectorStore`, and a
-`VectorStoreIndex` over it. Two deliberate choices baked in:
+`VectorStoreIndex` over it. Every function takes an `embed` tier
+(`"small"`/`"large"`, default small) and resolves model/dimension/table from
+`EMBED_CONFIGS`; `full_table(embed)` gives the actual Postgres table name.
+Raw-SQL helpers share a `_conn()` contextmanager (commit + close under
+try/finally). Two deliberate choices baked in:
 
 - **No ANN index (D11):** by omitting `hnsw_kwargs`, Postgres does an exact
   brute-force cosine scan. At ~60 pages that is instant and gives *exact*
@@ -82,14 +95,16 @@ The database seam. Provides the OpenAI embedder, the `PGVectorStore`, and a
 
 ### `ingest.py` — the offline pipeline, orchestrated
 Ties phase one together: drop table → `load_pages` → `build_nodes` → embed +
-load into pgvector. Then it **verifies**: asserts the row count equals the chunk
-count (nothing silently dropped) and asserts no ANN index exists (D11 held).
-This is the `python -m src.ingest` command that populates the database. (D8/D9/D18)
+load into pgvector. Then it **verifies**: the row count must equal the chunk
+count (nothing silently dropped) and no ANN index may exist (D11 held) — both
+raise `RuntimeError` (not `assert`, so `python -O` can't strip the guards).
+`python -m src.ingest [small|large]` picks the embedding tier. (D8/D9/D18)
 
 ### `retrieve.py` — question → top-5 chunks
 The query phase begins. Embeds the question and pulls the 5 nearest chunks by
-cosine similarity. Tiny by design — currently pure dense retrieval. This is
-where hybrid (keyword) search and reranking will slot in later (M3). (D11, D13)
+cosine similarity; takes an `embed` tier so the M2 A/B can query either table.
+Tiny by design — currently pure dense retrieval. This is where hybrid (keyword)
+search and reranking will slot in later (M3). (D11, D13)
 
 ### `generate.py` — chunks → grounded, sourced answer
 The payoff. Hand-rolls the prompt (rather than using a LlamaIndex query engine)
@@ -102,7 +117,9 @@ Two things worth noting:
 
 - **`answer_from_chunks(question, chunks)`** is split out from `answer(question)`
   deliberately — it is the seam where M2 judges the exact context used (D17), and
-  M3 inserts rerank/fuse before generation.
+  M3 inserts rerank/fuse before generation. Likewise **`format_context(chunks)`**
+  is split out of `build_prompt` so the M2 judge grades the byte-identical
+  context block the generator saw.
 - **`_answer_text`** fails *loudly* on a truncated or empty response. Adaptive
   thinking shares the token budget, so a cutoff mid-thinking can leave zero
   answer text — and "empty answer next to confident-looking sources" is exactly

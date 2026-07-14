@@ -27,6 +27,9 @@ def build_nodes(pages: list[Document]) -> list[TextNode]:
         first_line = node.text.strip().splitlines()[0] if node.text.strip() else ""
         starts_with_heading = detect_heading(first_line)
         node.metadata["section"] = starts_with_heading or current or "unknown"
+        # D20: the section is topical signal (continuation chunks inherit a
+        # heading their body lacks) — embed it; the page number is noise.
+        node.excluded_embed_metadata_keys = ["page"]
         if headings:
             current = headings[-1]
     return nodes

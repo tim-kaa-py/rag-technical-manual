@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 from llama_index.core.schema import NodeWithScore, TextNode
 
-from src.generate import _answer_text, build_prompt, sources_from
+from src.generate import _answer_text, build_prompt, format_context, sources_from
 
 
 def _chunk(text: str, page: str, section: str, score: float = 0.9) -> NodeWithScore:
@@ -19,6 +19,14 @@ def test_build_prompt_contains_context_question_and_page_labels():
     assert "Use fuel conforming to EN590." in prompt
     assert "Which fuel standard?" in prompt
     assert "[p. 43" in prompt  # chunks are labeled so the model can cite pages
+
+
+def test_format_context_labels_blocks_and_is_used_by_build_prompt():
+    chunks = [_chunk("Use fuel conforming to EN590.", "43", "5.6 Fuel")]
+    context = format_context(chunks)
+    assert context.startswith("[p. 43 | 5.6 Fuel]")
+    assert "Use fuel conforming to EN590." in context
+    assert context in build_prompt("Which fuel standard?", chunks)
 
 
 def test_sources_from_preserves_order_and_truncates_snippets():

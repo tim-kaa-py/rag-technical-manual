@@ -40,14 +40,19 @@ class RagAnswer:
     sources: list[Source]
 
 
-def build_prompt(question: str, chunks: list[NodeWithScore]) -> str:
+def format_context(chunks: list[NodeWithScore]) -> str:
+    """The exact context block the model sees — reused by the M2 judge so the
+    judged context is byte-identical to the generated-from context (D17)."""
     blocks = [
         f"[p. {c.node.metadata['page']} | {c.node.metadata.get('section', 'unknown')}]\n"
         f"{c.node.text}"
         for c in chunks
     ]
-    context = "\n\n---\n\n".join(blocks)
-    return f"Context excerpts from the manual:\n\n{context}\n\nQuestion: {question}"
+    return "\n\n---\n\n".join(blocks)
+
+
+def build_prompt(question: str, chunks: list[NodeWithScore]) -> str:
+    return f"Context excerpts from the manual:\n\n{format_context(chunks)}\n\nQuestion: {question}"
 
 
 def sources_from(chunks: list[NodeWithScore]) -> list[Source]:

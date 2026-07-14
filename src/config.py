@@ -17,16 +17,21 @@ CHUNK_OVERLAP = 64
 # D13 — context budget: every measured config delivers exactly 5 chunks
 TOP_K = 5
 
-# D3 — embeddings (A/B against -large happens in M2)
-EMBED_MODEL = "text-embedding-3-small"
-EMBED_DIM = 1536
+# D3 — embedding tiers; the M2 harness A/Bs small vs large (D7/D17).
+# Each tier gets its own table so the configs are not mutually destructive
+# under D18's drop-and-rebuild. LlamaIndex prefixes tables with "data_".
+EMBED_CONFIGS = {
+    "small": {"model": "text-embedding-3-small", "dim": 1536, "table": "teksan_manual"},
+    "large": {"model": "text-embedding-3-large", "dim": 3072, "table": "teksan_manual_large"},
+}
+DEFAULT_EMBED = "small"
 
-# D16 — per-role model tiers; only generation is used in M1
+# D16 — per-role model tiers
 GENERATION_MODEL = "claude-sonnet-5"
+JUDGE_MODEL = "claude-opus-4-8"
 
 _ROOT = Path(__file__).resolve().parent.parent  # repo root, independent of cwd
 PDF_PATH = _ROOT / "data" / "teksan_generator.pdf"
-TABLE_NAME = "teksan_manual"  # LlamaIndex will create it as data_teksan_manual
 
 
 def pg_params() -> dict:

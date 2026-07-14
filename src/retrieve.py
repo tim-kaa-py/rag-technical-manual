@@ -4,12 +4,14 @@ import sys
 
 from llama_index.core.schema import NodeWithScore
 
-from src.config import TOP_K
+from src.config import DEFAULT_EMBED, TOP_K
 from src.store import get_index
 
 
-def retrieve(question: str, k: int = TOP_K) -> list[NodeWithScore]:
-    retriever = get_index().as_retriever(similarity_top_k=k)
+def retrieve(
+    question: str, k: int = TOP_K, embed: str = DEFAULT_EMBED
+) -> list[NodeWithScore]:
+    retriever = get_index(embed).as_retriever(similarity_top_k=k)
     return retriever.retrieve(question)
 
 
