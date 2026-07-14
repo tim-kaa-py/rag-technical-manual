@@ -111,6 +111,22 @@ Output goes to `eval/results/`:
 `config_label` (e.g. `dense-small`) is the run's identity — M3 adds fused and
 reranked configs on the same embedding tier, and filenames must not collide.
 
+## The embedding A/B (small vs large, D3)
+
+`--compare A.json B.json` prints a per-question side-by-side. Design
+guarantees: both tiers index **byte-identical chunks** (verified by sha256
+digest over the table text, not assumed), each tier lives in its own Postgres
+table (drop-and-rebuild of one can't destroy the other), and both runs use
+the same frozen exam and the same calibrated judge.
+
+**The attributable readout is hit/MRR only.** Each config must regenerate its
+own answers (its context differs), so grounded/correct deltas carry generation
+sampling and judge noise and are never attributed to the embedding tier. Any
+delta smaller than one question (~0.09 MRR at n=11) is below the instrument's
+resolution — "no measurable difference; small suffices" was pre-committed as a
+valid finding, and it is what the 2026-07-14 A/B measured (hit identical
+10/11; MRR +0.05 for large — sub-resolution).
+
 ## Files
 
 - `eval/golden.py` — `GoldenQuestion` (frozen dataclass) + `load_golden()`,

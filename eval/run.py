@@ -167,13 +167,51 @@ def calibrate(run_json: Path) -> None:
     print("D17 rule: 0 flips -> single-run judging; otherwise majority-of-3 becomes standing protocol")
 
 
+def compare(path_a: Path, path_b: Path) -> None:
+    """A/B readout (D3/D17): attributable metrics are hit/MRR only — each
+    config regenerates its own answers (the context differs, so it must), so
+    grounded/correct deltas carry generation and judge noise and must not be
+    attributed to the embedding tier."""
+    a, b = json.loads(path_a.read_text()), json.loads(path_b.read_text())
+    la, lb = a["config_label"], b["config_label"]
+    print(f"| id | hit {la} | hit {lb} | RR {la} | RR {lb} | same top-5? |")
+    print("|---|---|---|---|---|---|")
+    rows_b = {r["id"]: r for r in b["rows"]}
+    identical = []
+    for ra in a["rows"]:
+        if ra["trap"]:
+            continue
+        rb = rows_b[ra["id"]]
+        same = ra["retrieved_pages"] == rb["retrieved_pages"]
+        if same:
+            identical.append(ra["id"])
+        print(f"| {ra['id']} | {int(ra['hit'])} | {int(rb['hit'])} "
+              f"| {ra['rr']:.2f} | {rb['rr']:.2f} | {'yes' if same else ''} |")
+    for run in (a, b):
+        scored = [r for r in run["rows"] if not r["trap"]]
+        n = len(scored)
+        print(f"{run['config_label']}: hit {sum(r['hit'] for r in scored)}/{n}, "
+              f"MRR {sum(r['rr'] for r in scored) / n:.2f}, "
+              f"grounded {sum(r['grounded'] for r in scored)}/{n}, "
+              f"correct {sum(r['correct'] for r in scored)}/{n}")
+    print(
+        f"attributable readout: hit/MRR. grounded/correct deltas are confounded with "
+        f"generation sampling and judge noise. rows with identical top-5 ({identical}) "
+        f"— any judge disagreement there is a free noise estimate."
+    )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--embed", default=DEFAULT_EMBED, choices=list(EMBED_CONFIGS))
-    parser.add_argument("--calibrate", type=Path, default=None, metavar="RUN_JSON")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--calibrate", type=Path, default=None, metavar="RUN_JSON")
+    group.add_argument("--compare", type=Path, nargs=2, default=None, metavar=("A_JSON", "B_JSON"))
     args = parser.parse_args()
     if args.calibrate:
         calibrate(args.calibrate)
+    elif args.compare:
+        compare(*args.compare)
     else:
         path = write_report(run_eval(args.embed))
         print(f"report: {path}")
