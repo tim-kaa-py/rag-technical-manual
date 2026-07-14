@@ -10,7 +10,7 @@ It mirrors the document-heavy field-service problem space (technical manuals, tr
 # 1. Install deps
 uv sync
 
-# (one-time) enable the repo's git hooks — keeps docs/documentation.md in sync
+# (one-time) enable the repo's git hooks — keeps docs/documentation/ in sync
 git config core.hooksPath .githooks
 
 # 2. Secrets
@@ -42,6 +42,13 @@ Summarised in `CLAUDE.md`; running decision log with alternatives in `docs/decis
 
 ## Documentation
 
-- `docs/documentation.md` — engineering documentation: what every file does and why, following the ingest → query pipeline. A pre-commit hook (`.githooks/pre-commit`) blocks commits that change `src/` without updating this doc; run `git config core.hooksPath .githooks` once per clone to enable it.
+Engineering docs live under `docs/documentation/`, one per code area:
+
+- `docs/documentation/src.md` — the RAG pipeline (ingest → query), file by file. **Present.**
+- `docs/documentation/eval.md` — the evaluation harness: methodology, metrics, how to read the numbers. *Arrives with M2.*
+- `docs/documentation/api.md` — the FastAPI service: endpoint contract, request/response, errors. *Arrives with M4.*
+
+A pre-commit hook (`.githooks/pre-commit`) blocks a commit that changes `src/`, `eval/`, or `api/` without updating that area's doc. Enable it once per clone with `git config core.hooksPath .githooks`.
+
 - `docs/decisions.md` — running decision log (D1–D18) that the code references by ID.
 - `docs/requirements.md` — engineering spec and milestones.
