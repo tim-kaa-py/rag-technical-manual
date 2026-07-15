@@ -32,6 +32,22 @@ uv run python -m eval.run --mode rerank --embed small  # golden Q&A -> metrics r
 uv run python -m eval.run --compare A.json B.json       # config A/B side-by-side
 ```
 
+## Serving the API
+
+```bash
+uv run uvicorn api.main:app --reload   # http://127.0.0.1:8000
+```
+
+Send a test query:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "your question here"}' | python3 -m json.tool
+```
+
+Or use the interactive Swagger UI at `http://127.0.0.1:8000/docs`.
+
 ## Data
 
 The corpus is **not** committed (copyrighted manuals / local assets, gitignored):
