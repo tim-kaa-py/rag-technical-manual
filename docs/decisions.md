@@ -222,3 +222,31 @@ Running log of design decisions. Each entry: what was decided, what was consider
 - *Strict F6 shape (hide the fallback flag)* — smaller response, exactly the spec; but D14's fallback exists to keep queries alive, not to be invisible — hiding it makes the API lie about its own ranking quality. Rejected.
 
 **Why:** serve what was measured best, and never report a degraded response as a full-quality one. Generation gets no graceful degradation by design (D15: no answer beats a wrong answer), so its failures are errors — 502 for "an upstream model didn't deliver", 500 for "our code broke".
+
+## D25 — M5 caption scope: five pages; p. 48 replaced, not augmented (2026-07-17)
+
+**Decision:** M5 vision-captions **five** image-bound pages — p. 42 (the F5 chart asset), p. 48 (maintenance schedule), pp. 49–51 (troubleshooting table) — and **deletes p. 48's two shredded text chunks** when its caption lands. Pages 42/49 keep their genuine prose alongside their captions; pp. 50/51 have no rows to replace (D22). Golden annotations for q7/q8/q9 amended (annotations only, D23 precedent) with pre-committed expectations frozen before measurement: q7 hit is a *genuine prediction* (its old hit rode the deleted shredded chunks) + grounded + correct; q8 hit (verified by caption node identity, not page) + correct; q9 correct only (retrieval already saturated); no regressions on q1–q6/q10/q11; trap q12 still refuses.
+
+**Considered:**
+- *Five pages + p. 48 replacement* — chosen: q8's answer row is on the p. 49 image (D19), and M3 measured the shredded p. 48 text actively harming quality (rerank q7/grounded fail: the shredded chunk at rank 1 lured a partial ungrounded answer) — its information content is negative, so coexistence would leave measured noise competing with the caption.
+- *Chart-only (strict F5)* — smallest scope, exactly the spec's letter, but leaves the measured q7/q8 failures standing when the identical mechanism fixes them. Rejected.
+- *Coexistence for p. 48* — deletes nothing, feels safer, but keeps the measured-negative chunks in the index and re-risks exactly the M3 q7 failure. Rejected.
+
+**Why:** the eval already demonstrated each gap (D19's measure-first discipline); captioning is the one mechanism that closes all of them, and replacement is justified by measurement, not taste.
+
+**Pre-registered contingency:** if q7/q8 miss top-5 under page-level captions, the named remedy is per-unit caption splitting (one node per problem for pp. 49–51, per system-group for p. 48) — the descendant of D9's retired "one block per problem" trigger.
+
+**Known limitation:** the `large` embed table stays text-only after M5 — a future `--embed large` run would compare across different corpora until re-ingested and re-captioned.
+
+## D26 — Caption pipeline: cached inspectable captions, deterministic node IDs, one node per page (2026-07-17)
+
+**Decision:** Captions are Claude-vision transcriptions (`CAPTION_MODEL` = Sonnet 5, D16) written to `data/captions/p*.md` (gitignored) and reused byte-identically on re-runs; caption nodes carry deterministic IDs (uuid5 of the page), exactly `{page, section}` metadata in the pipeline's normalized heading vocabulary, and `excluded_embed_metadata_keys=["page"]` — the precise shape `store.load_nodes` reconstructs. One caption node per page image; the pp. 50/51 vision calls also receive the p. 49 image as column-header context.
+
+**Considered:**
+- *Cached file captions* — chosen: the caption is the new grounding root (the judge verifies answer-vs-caption, never caption-vs-image), so it must be human-auditable (N1) and byte-stable (N3) — re-sampling vision on every run would change node text, node.hash, and eval numbers.
+- *No cache (caption on every run)* — simpler, always fresh, but nondeterministic: node.hash churn breaks D12's dedup expectations and the eval numbers wobble with sampling. Rejected.
+- *One merged caption for the 49–51 table* — best cross-page coherence, but D17's expected-page sets score page-attributed chunks; a merged node can't carry three page labels. Rejected (the context-image trick recovers the coherence instead).
+
+**Why:** deterministic identity (uuid5) makes the caption step idempotent — re-runs replace instead of duplicate — and the exact-metadata-shape rule keeps `node.hash` (sha256 of text + metadata) identical across process restarts, which RRF dedup (D12) silently depends on.
+
+**Known limitation (stated, not hidden):** caption fidelity is secured only by a human audit of caption-vs-image at creation time; the automated harness can never see past the caption.

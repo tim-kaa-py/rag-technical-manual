@@ -59,7 +59,7 @@
     "question": "At what interval should the V-belt tension be checked?",
     "expected_pages": ["48"],
     "golden_answer": "The tension of the V-belts must be checked at start-up, every 200 hours of engine running, and at least once every year.",
-    "annotation": "predicted fail — D9: the p. 48 maintenance-schedule table extracts as shredded text with row-to-interval associations lost",
+    "annotation": "pre-M5 predicted-fail (D9: the p. 48 schedule table extracts shredded, task-to-interval associations lost); M5 replaced the p. 48 text with a vision caption (D25) — pre-committed: hit is a genuine prediction (the old hit rode the deleted shredded chunks), grounded + correct expected",
     "trap": false
   },
   {
@@ -68,7 +68,7 @@
     "question": "The engine cranks slowly and will not start. What are the possible causes?",
     "expected_pages": ["49"],
     "golden_answer": "Possible causes for 'engine turns slow, but does not start': de-charged batteries; defective starter; unsuitable oil specification; no fuel in the tank; air in the fuel system; inoperative fuel solenoid; clogged oil filter; defective manual fuel lift pump; defective fuel injection pump; poor compression; engine mechanical fault (piston, piston rings etc.); defective control unit; problem in the control panel; problems with electrical connections.",
-    "annotation": "predicted fail — D19: the troubleshooting table is an image (this row on the p. 49 image; the table continues as images on pp. 50-51); only the 6.1 General intro text extracts",
+    "annotation": "pre-M5 predicted-fail (D19: troubleshooting table image-only; this row on the p. 49 image, table continues on pp. 50-51); M5 captions pp. 49-51 (D25) — pre-committed (D23): hit + correct expected; hit must be verified by caption node identity, not page",
     "trap": false
   },
   {
@@ -77,7 +77,7 @@
     "question": "Which SAE oil grade should be used at an ambient temperature of -30°C?",
     "expected_pages": ["42"],
     "golden_answer": "SAE 5W/30 — in the lubricant chart it is the only grade whose range covers -30°C (SAE 10W/30 reaches only down to -25°C and SAE 15W/40 only to -15°C).",
-    "annotation": "predicted fail — D6: the answer exists only in the SAE chart image on p. 42; M5 target",
+    "annotation": "pre-M5 predicted-fail (D6: answer only in the SAE chart image on p. 42); M5 captions the chart (D25) — pre-committed (D23): correct expected; retrieval already saturated (p. 42 at rank 1)",
     "trap": false
   },
   {
