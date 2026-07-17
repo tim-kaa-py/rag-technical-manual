@@ -148,11 +148,12 @@ def caption_page(client: anthropic.Anthropic, page: str) -> str:
         return cache.read_text()
     spec = PAGE_SPECS[page]
     blocks = [_image_block(_page_image(p)) for p in [*spec["context_pages"], page]]
-    # Sonnet 5: thinking omitted = adaptive, sharing max_tokens — budget for
-    # a dense table transcription plus thinking, and fail loudly on truncation
+    # Sonnet 5: thinking omitted = adaptive, sharing max_tokens — the visible
+    # transcription is small, but thinking over a dense table image is not
+    # (8000 measured truncating on the p. 42 chart); fail loudly on truncation
     response = client.messages.create(
         model=CAPTION_MODEL,
-        max_tokens=8000,
+        max_tokens=16000,
         system=CAPTION_SYSTEM,
         messages=[{"role": "user", "content": [*blocks, {"type": "text", "text": spec["prompt"]}]}],
     )
