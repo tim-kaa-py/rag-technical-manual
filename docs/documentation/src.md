@@ -1,6 +1,6 @@
 # Code Documentation — M1 Core RAG Spine
 
-_Last updated: 2026-07-14 · reflects milestone M3 + the M4 serving hooks (`warm()`, `GenerationIncompleteError`)_
+_Last updated: 2026-07-17 · reflects milestone M5 (vision captions: `multimodal.py`, store delete helpers)_
 
 This document maps every file in the codebase and explains what it does and why.
 It reflects the **M1** state: the straight-line path from a PDF to a grounded,
@@ -35,7 +35,9 @@ ID that fixed it (traceable to [decisions.md](../decisions.md)):
   `"large"` (`text-embedding-3-large`, 3072-dim, table `teksan_manual_large`).
   Separate tables per tier so drop-and-rebuild ingest (D18) of one tier can't
   destroy the other. `DEFAULT_EMBED = "small"`.
-- Generation model: `claude-sonnet-5`; judge model: `claude-opus-4-8` (D16)
+- Generation model: `claude-sonnet-5`; judge model: `claude-opus-4-8`;
+  caption model: `claude-sonnet-5` (`CAPTION_MODEL` — the F5 vision caption
+  shares generation's tier) (D16)
 - PDF path and Postgres connection params
 
 `_check()` is the **M0 smoke test** (`python -m src.config`): confirms Postgres
@@ -102,6 +104,10 @@ try/finally). Two deliberate choices baked in:
   the PDF, so dense and sparse score byte-identical chunk sets. The
   reconstruction mirrors ingest exactly (same metadata, same D20 exclusion);
   a hermetic test pins hash + embed-content equality against `build_nodes`.
+- **`delete_by_page()` / `delete_by_node_ids()`** (M5): surgical row removal
+  for the caption step — the first replaces p. 48's shredded extraction
+  (D25), the second makes caption re-runs idempotent via their deterministic
+  node IDs (D26).
 
 ### `ingest.py` — the offline pipeline, orchestrated
 Ties phase one together: drop table → `load_pages` → `build_nodes` → embed +
@@ -109,6 +115,33 @@ load into pgvector. Then it **verifies**: the row count must equal the chunk
 count (nothing silently dropped) and no ANN index may exist (D11 held) — both
 raise `RuntimeError` (not `assert`, so `python -O` can't strip the guards).
 `python -m src.ingest [small|large]` picks the embedding tier. (D8/D9/D18)
+
+### `multimodal.py` — vision captions for the image-bound pages (M5)
+The F5 extension. Five pages hold answers no text extraction can reach —
+p. 42 (SAE viscosity chart), p. 48 (icon-matrix maintenance schedule),
+pp. 49–51 (troubleshooting table images). Each gets **one caption node**:
+a structured Claude-vision transcription (`CAPTION_MODEL`, D16), indexed as
+a first-class chunk. Key mechanics (D25/D26):
+
+- **Runs after `src.ingest`** (`python -m src.multimodal`): D18's
+  drop-and-rebuild wipes captions, so re-ingest ⇒ re-run this ⇒ restart the
+  API (D12 BM25 rebuild).
+- **Captions are cached files** (`data/captions/p*.md`, gitignored — derived
+  from the copyrighted manual). The caption is the new grounding root: the
+  judge can only check answer-vs-caption, never caption-vs-image, so captions
+  must be human-auditable (N1) and byte-stable across runs (N3).
+- **Replacement, not coexistence, on p. 48**: its 2 shredded text chunks are
+  deleted — M3 measured them luring a partial ungrounded answer (rerank
+  q7/grounded fail). Pages 42/49 keep their genuine prose alongside.
+- **Deterministic node IDs** (uuid5 of the page) + metadata of exactly
+  `{page, section}` in the pipeline's normalized heading vocabulary — the
+  precise shape `load_nodes` reconstructs, preserving `node.hash` (RRF dedup,
+  D12) across restarts.
+- p. 42 captions the `oil_viscosity_chart.png` asset (F5 names it); pp. 48–51
+  are full-page pymupdf renders; pp. 50/51 calls also ship the p. 49 image so
+  continuation pages keep the table's column headers.
+- Loud failures throughout: truncated/empty captions raise; post-insert row
+  arithmetic and the D11 no-ANN check re-verify the store.
 
 ### `retrieve.py` — question → top-5 chunks
 The query phase begins. Embeds the question and pulls the 5 nearest chunks by

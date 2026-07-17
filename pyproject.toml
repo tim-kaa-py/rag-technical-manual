@@ -25,6 +25,7 @@ dependencies = [
     "python-dotenv",
     "pydantic",
     "llama-index-retrievers-bm25>=0.7.1",
+    "pymupdf>=1.28.0",
 ]
 
 [dependency-groups]

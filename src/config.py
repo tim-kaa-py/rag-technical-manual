@@ -33,6 +33,7 @@ DEFAULT_EMBED = "small"
 GENERATION_MODEL = "claude-sonnet-5"
 JUDGE_MODEL = "claude-opus-4-8"
 RERANK_MODEL = "claude-haiku-4-5"  # D16; swap predicate pre-registered in the M3 plan Task 4
+CAPTION_MODEL = "claude-sonnet-5"  # D16: the F5 vision caption shares generation's tier
 
 _ROOT = Path(__file__).resolve().parent.parent  # repo root, independent of cwd
 PDF_PATH = _ROOT / "data" / "teksan_generator.pdf"

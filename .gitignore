@@ -10,6 +10,8 @@ handover.md
 data/*.pdf
 data/*.png
 data/*.jpg
+# M5 vision captions + page renders: derived from the copyrighted manual
+data/captions/
 !data/.gitkeep
 
 # Python

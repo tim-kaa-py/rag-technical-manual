@@ -69,6 +69,20 @@ def verify_store(embed: str = DEFAULT_EMBED) -> tuple[int, list[str]]:
     return rows, ann
 
 
+def delete_by_page(page: str, embed: str = DEFAULT_EMBED) -> int:
+    """D25: remove one page's rows (shredded-extraction replacement)."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(f'DELETE FROM "{full_table(embed)}" WHERE metadata_->>%s = %s', ("page", page))
+        return cur.rowcount
+
+
+def delete_by_node_ids(node_ids: list[str], embed: str = DEFAULT_EMBED) -> int:
+    """D26: idempotent caption replacement — delete by deterministic id."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(f'DELETE FROM "{full_table(embed)}" WHERE node_id = ANY(%s)', (node_ids,))
+        return cur.rowcount
+
+
 def load_nodes(embed: str = DEFAULT_EMBED) -> list[TextNode]:
     """Rebuild chunk nodes FROM Postgres (D12): dense and sparse must score
     byte-identical chunk sets, so the sparse index is derived from the store
