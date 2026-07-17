@@ -40,9 +40,11 @@ rows only.
 | rerank-small-mm (M5, captions) | **11/11** | **1.00** | **11/11** | **11/11** |
 
 Every remaining failure of the text-only system was a corpus gap, not a
-pipeline gap — and captioning closed all of them. Both instruments (hit@5,
-MRR@5) are now saturated: the golden set can no longer distinguish further
-improvements (D17's ~9-points-per-question resolution).
+pipeline gap — and captioning closed all of them. All four axes are now at
+ceiling (hit@5, MRR@5, grounded, correct — and the hallucination probe is
+n=1): the golden set can no longer distinguish further improvements (D17's
+~9-points-per-question resolution). The saturation is one-sided — the set
+remains a valid *regression* detector, which is its only remaining job.
 
 ### Pre-committed expectations (D23/D25, frozen before this run) — all held
 
@@ -65,8 +67,8 @@ improvements (D17's ~9-points-per-question resolution).
 - **No regressions on q1–q6/q10/q11** — held: all RR 1.00, all grounded and
   correct. The +5 caption nodes reshuffled some top-5 *tails* (annotated
   "same top-5?" = no on most rows) without touching any expected page's
-  rank-1. q2/q6 kept byte-identical top-5s and identical verdicts — the free
-  judge-noise estimate shows zero noise.
+  rank-1. q2/q6 kept byte-identical top-5s and identical verdicts —
+  consistent with zero verdict noise (n=2 cannot demonstrate zero).
 - **Trap q12 still refuses** — held (and this run had zero rerank fallbacks;
   the M3 trap-row fallback did not recur).
 
@@ -78,6 +80,11 @@ re-judged 3× fresh against the logged artifacts: 4/4 unanimous with the
 logged verdict — real behavior changes downstream of the corpus change, not
 judge noise.
 
+As in the M3 record: grounded/correct reflect **one generation sample** per
+question. The 3× re-judge bounds judge noise on the logged answers; it does
+not measure generation-to-generation variance — a perfect score needs this
+line more than any other score does.
+
 ### Instrument disclosures for this run
 
 - **The caption is the new grounding root** (D26 known limitation): the
@@ -87,9 +94,23 @@ judge noise.
   the 33-row p. 48 transcription (two tasks with a mark in the
   First-Maintenance column mis-attributed to Start-up); both were corrected
   against the image and the corrected caption re-indexed **before** this run.
-  The q7-critical V-belt row was verified correct as generated.
+  The shipped captions are therefore human-edited vision output — caption
+  fidelity is a human-in-the-loop property, audited in a single pass that
+  itself found a ~2/33 cell error rate in raw vision output; non-golden
+  caption rows are audited once and never re-checked by the harness.
+- **Audit circularity, stated plainly:** the pre-measurement audit verified
+  the q7/q8/q9-critical caption content against the golden answers (the
+  V-belt intervals, the slow-crank cause list, the SAE bounds). The
+  correctness flips therefore measure the end-to-end multimodal path —
+  retrieval → generation → judging over pre-verified captions — not
+  unaudited vision-caption fidelity. Legitimate for a before/after
+  demonstration ("the mechanism works"); it must not be read as "captions
+  are generally accurate."
 - The header's "Predicted-fail ceiling: 0 rows … (D9/D19/D6)" line is now
   vestigial wording: those annotations were amended (D25) because M5 resolved
   the gaps the citation refers to; best-achievable correct is genuinely 11/11.
 - The `large` embedding table remains text-only (D25 known limitation): a
   future `--embed large` run would compare across different corpora.
+- One prior invocation of this run failed on a network timeout (q12
+  generation) **before any results were written** — no results existed to
+  discard; the completed run is the only artifact.
