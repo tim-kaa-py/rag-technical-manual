@@ -15,6 +15,13 @@ def _verdict(passed: bool) -> SimpleNamespace:
     return SimpleNamespace(passed=passed, justification="stub reasoning")
 
 
+def test_config_label_appends_corpus_tag():
+    # the M5 corpus-state tag: same mode+embed on a different corpus must
+    # not produce a colliding run identity
+    assert run_mod.config_label("rerank", "small") == "rerank-small"
+    assert run_mod.config_label("rerank", "small", "mm") == "rerank-small-mm"
+
+
 def test_run_eval_and_write_report_agree_on_row_schema(monkeypatch, tmp_path):
     golden = [
         GoldenQuestion(

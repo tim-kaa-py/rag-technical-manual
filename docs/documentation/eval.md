@@ -1,6 +1,6 @@
 # Evaluation Harness
 
-_Last updated: 2026-07-14 · reflects milestone M2 (in progress — golden set frozen)_
+_Last updated: 2026-07-17 · reflects milestone M5 (adds the `--label` corpus-state tag)_
 
 How the pipeline's quality is measured and why the numbers can be trusted.
 Decision IDs (`D17`, …) reference [decisions.md](../decisions.md). The
@@ -122,6 +122,9 @@ Output goes to `eval/results/`:
 
 `config_label` (e.g. `dense-small`) is the run's identity — M3 adds fused and
 reranked configs on the same embedding tier, and filenames must not collide.
+`--label <tag>` appends a corpus-state tag (e.g. `rerank-small-mm` after
+`src.multimodal` adds the M5 captions): same mode + embed on a *different
+corpus* must not share an identity either.
 
 ## The embedding A/B (small vs large, D3)
 

@@ -48,7 +48,13 @@ def _rerank(question: str, embed: str):
 MODES = {"dense": _dense, "hybrid": _hybrid, "rerank": _rerank}
 
 
-def run_eval(mode: str = "dense", embed: str = DEFAULT_EMBED) -> dict:
+def config_label(mode: str, embed: str, label: str | None = None) -> str:
+    """Run identity (D17): a corpus-state label (e.g. 'mm' after
+    src.multimodal) keeps two runs of the same mode+embed distinguishable."""
+    return "-".join(filter(None, [mode, embed, label]))
+
+
+def run_eval(mode: str = "dense", embed: str = DEFAULT_EMBED, label: str | None = None) -> dict:
     rows = []
     for q in load_golden():
         chunks, candidates, arms, fell_back = MODES[mode](q.question, embed)
@@ -110,7 +116,7 @@ def run_eval(mode: str = "dense", embed: str = DEFAULT_EMBED) -> dict:
         "embed": embed,
         "mode": mode,
         # config_label is the run's identity: filenames/compare headers must not collide
-        "config_label": f"{mode}-{embed}",
+        "config_label": config_label(mode, embed, label),
         # provenance lives in the artifact: after a D16 swap, two rerank runs
         # must be distinguishable by content, not directory
         "rerank_model": RERANK_MODEL if mode == "rerank" else None,
@@ -295,6 +301,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--embed", default=DEFAULT_EMBED, choices=list(EMBED_CONFIGS))
     parser.add_argument("--mode", default="dense", choices=list(MODES))
+    parser.add_argument(
+        "--label", default=None, help="corpus-state tag appended to config_label (e.g. mm)"
+    )
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--calibrate", type=Path, default=None, metavar="RUN_JSON")
     group.add_argument("--compare", type=Path, nargs=2, default=None, metavar=("A_JSON", "B_JSON"))
@@ -304,5 +313,5 @@ if __name__ == "__main__":
     elif args.compare:
         compare(*args.compare)
     else:
-        path = write_report(run_eval(args.mode, args.embed))
+        path = write_report(run_eval(args.mode, args.embed, args.label))
         print(f"report: {path}")
