@@ -2,11 +2,7 @@
 
 An end-to-end Retrieval-Augmented Generation system over a real technical service manual, built in Python. It answers field-service questions from the manual with grounded, sourced responses, exposes the pipeline over an API, measures its own quality with an evaluation harness, and extends to a multimodal case where the answer lives in a diagram.
 
-The project mirrors the document-heavy field-service problem space (complex technical manuals, troubleshooting, diagrams) and was built to prepare for and demonstrate fit for an **AI Solutions Manager** role at Octonomy.
-
-## Project context
-
-The detailed project context and rationale are kept in `docs/context.private.md`. That file is **gitignored** because it contains private notes and is not part of the published repository.
+The project mirrors the document-heavy field-service problem space (complex technical manuals, troubleshooting, diagrams) — the setting where grounded, sourced answers matter most, because a confident wrong maintenance instruction is the worst failure mode.
 
 ## What it does
 
@@ -56,8 +52,7 @@ rag-technical-manual/
 ├── CLAUDE.md                  ← this file
 ├── README.md                 ← quickstart (setup, docker, run)
 ├── docs/
-│   ├── requirements.md       ← the engineering spec (functional + non-functional + decisions + scope)
-│   └── context.private.md    ← private project context (gitignored)
+│   └── requirements.md       ← the engineering spec (functional + non-functional + decisions + scope)
 ├── pyproject.toml            ← uv-managed deps
 ├── .env.example              ← key/DB template (copy to .env; .env is gitignored)
 ├── data/                     ← corpus + multimodal asset (gitignored)
