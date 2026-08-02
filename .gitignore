@@ -1,7 +1,7 @@
 # Secrets
 .env
 
-# Private project context (interview strategy / personal notes — never publish)
+# Private notes (never publish)
 docs/*.private.md
 handover.md
 .claude/settings.local.json
