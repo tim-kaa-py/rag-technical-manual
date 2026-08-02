@@ -104,7 +104,7 @@
     "question": "What is the tightening torque for the cylinder head bolts?",
     "expected_pages": [],
     "golden_answer": "",
-    "annotation": "trap — no torque specification anywhere in the corpus: text grep finds 'torque' only in the p. 9 towing-trailer section (no value), and all 60 pages were visually verified free of torque values (independent reviewer pass); expected behavior: explicit refusal (D15)",
+    "annotation": "trap — no torque specification anywhere in the corpus: text grep finds 'torque' only in the p. 9 towing-trailer section (no value), and all 60 pages were visually verified free of torque values (second review pass by a separate AI-agent session, independent of the authoring session — wording clarified 2026-08-02, D27); expected behavior: explicit refusal (D15)",
     "trap": true
   }
 ]

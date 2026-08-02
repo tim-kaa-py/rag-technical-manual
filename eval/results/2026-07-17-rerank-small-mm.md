@@ -105,7 +105,16 @@ line more than any other score does.
   retrieval → generation → judging over pre-verified captions — not
   unaudited vision-caption fidelity. Legitimate for a before/after
   demonstration ("the mechanism works"); it must not be read as "captions
-  are generally accurate."
+  are generally accurate." The circularity extends to **elicitation**, not
+  only verification (added 2026-08-02, external review): the caption prompts
+  in `src/multimodal.py` were authored knowing the golden questions — the
+  p. 42 prompt asks for exactly the per-grade temperature bounds q9 needs. A
+  fresh image-bound page with an untailored prompt might caption far worse.
+- **Node-identity evidence made public** (added 2026-08-02): the candidates
+  log backing the "uuid5-verified" hit claims lives in the gitignored run
+  JSON; a redacted extract (rank + node_id + page, no chunk text) is
+  committed as
+  [2026-07-17-rerank-small-mm-candidates.md](2026-07-17-rerank-small-mm-candidates.md).
 - The header's "Predicted-fail ceiling: 0 rows … (D9/D19/D6)" line is now
   vestigial wording: those annotations were amended (D25) because M5 resolved
   the gaps the citation refers to; best-achievable correct is genuinely 11/11.
