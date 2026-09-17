@@ -3,6 +3,7 @@
 
 # Private notes (never publish)
 docs/*.private.md
+docs/*.private.html
 handover.md
 .claude/settings.local.json
 
